@@ -139,7 +139,7 @@ def lossPlotSingle(dirname, N_limit=None, best_score=False, sample_num=10000):
     
 def lossComparisonPlot(dirnames, parentdirname, N_limit=None, best_score=False, sample_num=10000, return_fig=False, axis=None):
     palette = cm.get_cmap('tab10')
-    colors =  {"random": "blue", "targeted": "orange", "active#2": "green"}
+    colors =  {"random": "blue", "combinatory": "red", "std": "green", "complexity-std": "purple", "loss-std": "cyan"}
     num = len(dirnames)
     
     fontsize_1 = 15 if not return_fig else 7
@@ -151,14 +151,15 @@ def lossComparisonPlot(dirnames, parentdirname, N_limit=None, best_score=False, 
         plt.sca(axis)
     return_list = []
     loss_max_list = []
-    for i in range(num):
-        parameters = _read_parameters(dirnames[i])
-        models = pd.read_csv(f'{dirnames[i]}/models.csv')
+    for i, dirname in enumerate(dirnames):
+        parameters = _read_parameters(dirname)
+        models = pd.read_csv(f'{dirname}/models.csv')
         models = _add_func_to_models(parameters, models)
+        #loss = pd.read_csv(f'{dirname}/loss.csv')
         
         loss_plot = _calc_loss_plot_data(models, sample_num, best_score=best_score, parameters=parameters)
         
-        convergence = np.array(loss_plot.mean_loss.tolist()[-parameters["loss_iter_below_tol"]:]).mean() if parameters["converged"] else np.array(loss_plot.mean_loss.tolist()[-5:]).mean()
+        convergence = np.array(loss_plot.min_loss.tolist()[-parameters["loss_iter_below_tol"]:]).mean() if parameters["converged"] else np.array(loss_plot.min_loss.tolist()[-5:]).mean()
         
         color = colors[parameters["algorithm"]]
         
@@ -171,12 +172,13 @@ def lossComparisonPlot(dirnames, parentdirname, N_limit=None, best_score=False, 
         else:
             loss_lim_idx = len(loss_plot.sample_size.tolist())-1
         
-        means = loss_plot.mean_loss[:loss_lim_idx]
+        # CHANGE FROM MEAN TO MIN!!!
+        means = loss_plot.min_loss[:loss_lim_idx]
         loss_max_list.append(means[0])
         
-        plt.scatter(loss_plot.sample_size.tolist()[:loss_lim_idx], means, color=color, label=f"({parameters['algorithm']}) mean loss")
-        plt.plot(loss_plot.sample_size.tolist()[:loss_lim_idx], means, color=color)
-        plt.hlines(convergence, xmin=loss_plot.sample_size.tolist()[0], xmax=loss_plot.sample_size.tolist()[loss_lim_idx], color=color, label=f"({parameters['algorithm']}) loss limit: {round(convergence,3)}")
+        plt.scatter(loss_plot.sample_size.tolist()[:loss_lim_idx], means, color=color, label=f"({parameters['algorithm']}) min loss", alpha=0.5)
+        plt.plot(loss_plot.sample_size.tolist()[:loss_lim_idx], means, color=color, alpha=0.5)
+        plt.hlines(convergence, xmin=loss_plot.sample_size.tolist()[0], xmax=loss_plot.sample_size.tolist()[loss_lim_idx], color=color, label=f"({parameters['algorithm']}) min loss limit: {round(convergence,3)}")
 
         return_list.append([loss_plot, means, convergence, loss_lim_idx, parameters, models])
     
@@ -202,7 +204,7 @@ def lossComparisonPlot(dirnames, parentdirname, N_limit=None, best_score=False, 
     plt.yticks(fontsize=fontsize_2)
     #plt.legend()
     if not return_fig:
-        plt.title(f"Comparison of average losses (random vs targeted): Sigma={_read_parameters(dirnames[0])['upper_sigma']}",fontsize=fontsize_3)
+        plt.title(f"Comparison of minimal losses: Sigma={_read_parameters(dirnames[0])['upper_sigma']}",fontsize=fontsize_3)
     fig = plt.gcf()
     if not return_fig:
         plt.draw()
@@ -335,3 +337,29 @@ def Animation(dirnames, parentdirname, plot_variable_idx=0):
     filename = f"{parentdirname}/{_read_parameters(dirnames[0])['equation'].replace('.',',').replace('/','÷')}_Animation.gif"
     anim = camera.animate(interval = 400)
     anim.save(filename)
+    
+def equation_bar_chart_animation(dirname):
+   
+    def top_n_equations(sample_size, equation_tracker, n):
+        equations = equation_tracker.iloc[equation_tracker["sample_size"] == sample_size]
+        return top_n_eqs, tickdic
+    
+    
+    from matplotlib import animation
+    import matplotlib.pyplot as plt
+    from matplotlib.animation import FuncAnimation
+    import seaborn as sns
+    
+    fig = plt.figure(figsize=(8,6))
+    axes = fig.add_subplot(1,1,1)
+    axes.set_ylim(0, 150)
+    plt.style.use("seaborn")
+    
+    palette = list(reversed(sns.color_palette("seismic", 2).as_hex()))
+    
+    # import data
+    parameters = _read_parameters(dirname)
+    equation_tracker = pd.read_csv(f'{dirname}/equations.csv')
+    
+    N = np.unique(equation_tracker['sample_size'].values)
+    pass
