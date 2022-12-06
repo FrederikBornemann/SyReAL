@@ -10,10 +10,10 @@ import json
 from datetime import datetime, timedelta
 from sympy.core.rules import Transform
 
-# VERSION 1.8
+# VERSION 1.9
 
 _kwargs = {
-    "version": 18,
+    "version": 19,
     "eq":"5 * cos(3.5 * x_0) - 1.3",
     "seed":2,
     "N":10000,
@@ -35,7 +35,8 @@ _kwargs = {
     "use_best_score": True,
     "penalize_sample_num": False,
     "equation_tracking": False,
-    "loss_sample_num": 100000
+    "loss_sample_num": 100000,
+    "pysr_params": dict(populations=20)
     }  
 
 # TODO: 
@@ -143,12 +144,13 @@ def _float_to_str(f):
     return str(f).replace(".",",").replace("/","÷")
 
 
-def check_convergence(model, prev_loss, step, iter_below_tol, loss_iter_below_tol, x_diff, true_func, args, check_if_loss_zero, use_best_score, loss_df, min_num_iter=25, abs_loss_tol=0.01, rel_loss_tol=0.1):
+def check_convergence(model, prev_loss, step, iter_below_tol, loss_iter_below_tol, check_if_loss_zero, loss_df, min_num_iter=25, abs_loss_tol=0.01, rel_loss_tol=0.1):
     """Checks if training for a model has converged."""
     has_converged = False
     #loss = loss_df.loss.mean()
     loss = loss_df.loss.min()
     # check if loss hit zero (true function has been found)
+    loss_list = np.array(loss_df.loss.tolist())
     if check_if_loss_zero:
         if True in np.isclose(loss_list, np.zeros(shape=loss_list.shape), atol=1e-6):
             has_converged = True
@@ -167,7 +169,7 @@ def check_convergence(model, prev_loss, step, iter_below_tol, loss_iter_below_to
         # number of iterations is achieved.
         if step < min_num_iter:
             has_converged = False
-    return has_converged, loss, iter_below_tol, loss_list
+    return has_converged, loss, iter_below_tol
 
 
 def _uniquify(path):
@@ -260,7 +262,7 @@ def _track_equations(prev_equations_df, model, n, penalize_sample_num, use_best_
     return prev_equations_df
     
     
-def _Search(algorithm, eq, seed, N, N_start, N_stop, xstart, xstop, upper_sigma, lower_sigma, niterations, parentdir, binary_operators, unary_operators, denoise, early_stop, loss_iter_below_tol, step_multiplier, check_if_loss_zero, version, use_best_score, penalize_sample_num, equation_tracking, loss_sample_num):
+def _Search(algorithm, eq, seed, N, N_start, N_stop, xstart, xstop, upper_sigma, lower_sigma, niterations, parentdir, binary_operators, unary_operators, denoise, early_stop, loss_iter_below_tol, step_multiplier, check_if_loss_zero, version, use_best_score, penalize_sample_num, equation_tracking, loss_sample_num, pysr_params):
     '''
     Takes true equation (eq), generates N data points and searches incrementily over these using the targeted algorithm until N_stop is reached.
     
@@ -400,13 +402,13 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, xstart, xstop, upper_sigma,
             # fit model on sample
             model = PySRRegressor(
                 niterations=niterations,
-                populations=20,
                 binary_operators=binary_operators,
                 unary_operators=unary_operators,
                 denoise=denoise,
                 model_selection='best',
                 temp_equation_file=True,
-                tempdir=os.getcwd()+"/tempdir"
+                tempdir=os.getcwd()+"/tempdir",
+                **pysr_params,
                 )
             time_start = datetime.now()
             
@@ -453,8 +455,8 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, xstart, xstop, upper_sigma,
                 has_converged, loss, iter_below_tol = check_convergence(model=model, prev_loss=loss, step=n, iter_below_tol=iter_below_tol, loss_iter_below_tol=loss_iter_below_tol, check_if_loss_zero=check_if_loss_zero, loss_df=loss_df)
                 if has_converged:
                     break
-                    
-            time_dict["Last equation tracking"] = td_eq_track
+            if equation_tracking:
+                time_dict["Last equation tracking"] = td_eq_track
             # write interim parameter json
             parameter_dict = {"last_n" : int(n), "time": time_dict}
             # write parameters in json file

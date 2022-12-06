@@ -338,6 +338,7 @@ def Animation(dirnames, parentdirname, plot_variable_idx=0):
     anim = camera.animate(interval = 400)
     anim.save(filename)
     
+    
 def equation_bar_chart_animation(dirname):
    
     def top_n_equations(sample_size, equation_tracker, n):
@@ -363,3 +364,83 @@ def equation_bar_chart_animation(dirname):
     
     N = np.unique(equation_tracker['sample_size'].values)
     pass
+
+
+def lossComparisonPlot2(dirnames, parentdirname, N_limit=None, best_score=False, sample_num=10000, return_fig=False, axis=None):
+    palette = cm.get_cmap('tab10')
+    colors =  {"random": "blue", "combinatory": "red", "std": "green", "complexity-std": "purple", "loss-std": "cyan"}
+    num = len(dirnames)
+    
+    fontsize_1 = 15 if not return_fig else 7
+    fontsize_2 = 13 if not return_fig else 5
+    fontsize_3 = 20 if not return_fig else 18
+
+    plt.figure(figsize=(13, 10), dpi= 100, facecolor='w', edgecolor='k')
+    if return_fig:
+        plt.sca(axis)
+    return_list = []
+    loss_max_list = []
+    for i, dirname in enumerate(dirnames):
+        parameters = _read_parameters(dirname)
+        #models = pd.read_csv(f'{dirname}/models.csv')
+        #models = _add_func_to_models(parameters, models)
+        models = None
+        loss = pd.read_csv(f'{dirname}/loss.csv')
+        
+        #loss_plot = _calc_loss_plot_data(models, sample_num, best_score=best_score, parameters=parameters)
+        loss_plot = loss[['loss', 'sample_size']].groupby("sample_size", as_index=False).min()
+        convergence = None #np.array(loss_plot.min_loss.tolist()[-parameters["loss_iter_below_tol"]:]).mean() if parameters["converged"] else np.array(loss_plot.min_loss.tolist()[-5:]).mean()
+        
+        color = colors[parameters["algorithm"]]
+        
+        if N_limit is not None:
+            try:
+                loss_lim_idx = loss_plot.sample_size.tolist().index(N_limit)
+            except:
+                loss_lim_idx = len(loss_plot.sample_size.tolist())-1
+                print(f"N_limit is too high. Highest sample size is {loss_plot.sample_size.tolist()[-1]}")
+        else:
+            loss_lim_idx = len(loss_plot.sample_size.tolist())-1
+        
+        # CHANGE FROM MEAN TO MIN!!!
+        means = loss_plot.loss.tolist()[:loss_lim_idx]
+        print(means)
+        loss_max_list.append(means[0])
+        
+        plt.scatter(loss_plot.sample_size.tolist()[:loss_lim_idx], means, color=color, label=f"({parameters['algorithm']}) min loss", alpha=0.5)
+        plt.plot(loss_plot.sample_size.tolist()[:loss_lim_idx], means, color=color, alpha=0.5)
+        #plt.hlines(convergence, xmin=loss_plot.sample_size.tolist()[0], xmax=loss_plot.sample_size.tolist()[loss_lim_idx], color=color, label=f"({parameters['algorithm']}) min loss limit: {round(convergence,3)}")
+        return_list.append([loss_plot, means, convergence, loss_lim_idx, parameters, models])
+    
+
+    ax = plt.gca()
+    handles, labels = ax.get_legend_handles_labels()
+    # handles = [h[0] for h in handles]
+    ax.legend(handles, labels, loc='upper right',numpoints=1, fontsize=fontsize_1)
+    
+    # text placement
+    left, width = .25, .5
+    bottom, height = .25, .5
+    right = left + width
+    top = bottom + height
+    
+    if not return_fig:
+        ax.text(right, top, _read_parameters(dirnames[0])["equation"], horizontalalignment='right', verticalalignment='top', transform=ax.transAxes, fontsize=fontsize_1)
+    
+    ax.set_ylim([0, np.array(loss_max_list).max()])
+    plt.xlabel("Sample size",fontsize=fontsize_1) 
+    plt.ylabel("True loss (MSE)",fontsize=fontsize_1)
+    plt.xticks(fontsize=fontsize_2)
+    plt.yticks(fontsize=fontsize_2)
+    #plt.legend()
+    if not return_fig:
+        plt.title(f"Comparison of minimal losses: Sigma={_read_parameters(dirnames[0])['upper_sigma']}",fontsize=fontsize_3)
+    fig = plt.gcf()
+    if not return_fig:
+        plt.draw()
+        plt.show()
+        filename = f"{parentdirname}/{_read_parameters(dirnames[0])['equation'].replace('.',',').replace('/','÷')}_loss_comparison2.png"
+        fig.savefig(filename, dpi=150, bbox_inches='tight')
+    else:
+        return_list.append([np.array(loss_max_list), palette])
+        return plt.gca(), return_list
