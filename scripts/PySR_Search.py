@@ -10,20 +10,19 @@ import json
 from datetime import datetime, timedelta
 from sympy.core.rules import Transform
 
-# VERSION 1.9
+# VERSION 20
 
 _kwargs = {
-    "version": 19,
-    "eq":"5 * cos(3.5 * x_0) - 1.3",
+    "version": 22,
+    "eq":"5.0 * cos(3.5 * x_0) - 1.3",
     "seed":2,
     "N":10000,
-    "N_start":2,
-    "N_stop":50,
-    "xstart":[0.0],
-    "xstop":[2.0],
+    "N_start":5,
+    "N_stop":150,
+    "boundaries":dict("x_0": [0.0, 2.0]),
     "upper_sigma":0.5,
     "lower_sigma":0.0,
-    "niterations":60,
+    "niterations":30,
     "parentdir":os.getcwd(),
     "binary_operators":["plus", "mult"],
     "unary_operators":["cos", "exp", "square"],
@@ -36,16 +35,23 @@ _kwargs = {
     "penalize_sample_num": False,
     "equation_tracking": False,
     "loss_sample_num": 100000,
-    "pysr_params": dict(populations=20)
+    "pysr_params": dict(populations=20),
+    "warm_start": False,
+    "abs_loss_zero_tol": 1e-6,
     }  
 
 # TODO: 
 #    - add feynman import
 #    - update prediction to jax https://astroautomata.com/PySR/api/#pysr.sr.PySRRegressor.jax
+#    - make resume possible (export X_df everytime), different dir names
 
-def _make_args(X, variable_num, f):
-    X_df = pd.DataFrame(X, columns = [f"x{i}" for i in range(variable_num)])
-    args = [X_df[f'{i}'] for i in f.free_symbols]
+def _repair_directory():
+    # If files are missing or broken, this function will fix them
+    pass
+
+def _make_args(X, variable_num, boundaries):
+    X_df = pd.DataFrame(X, columns = [f"{i}" for i in boundaries.keys()])
+    args = [X_df[f'{i}'] for i in boundaries.keys()]
     return X_df, args
     
 
@@ -144,7 +150,7 @@ def _float_to_str(f):
     return str(f).replace(".",",").replace("/","÷")
 
 
-def check_convergence(model, prev_loss, step, iter_below_tol, loss_iter_below_tol, check_if_loss_zero, loss_df, min_num_iter=25, abs_loss_tol=0.01, rel_loss_tol=0.1):
+def check_convergence(model, prev_loss, step, iter_below_tol, loss_iter_below_tol, check_if_loss_zero, loss_df, abs_loss_zero_tol, min_num_iter=25, abs_loss_tol=0.01, rel_loss_tol=0.1):
     """Checks if training for a model has converged."""
     has_converged = False
     #loss = loss_df.loss.mean()
@@ -152,7 +158,7 @@ def check_convergence(model, prev_loss, step, iter_below_tol, loss_iter_below_to
     # check if loss hit zero (true function has been found)
     loss_list = np.array(loss_df.loss.tolist())
     if check_if_loss_zero:
-        if True in np.isclose(loss_list, np.zeros(shape=loss_list.shape), atol=1e-6):
+        if True in np.isclose(loss_list, np.zeros(shape=loss_list.shape), atol=abs_loss_zero_tol):
             has_converged = True
     else:
         # Check if we have reached the desired loss tolerance.
@@ -172,7 +178,7 @@ def check_convergence(model, prev_loss, step, iter_below_tol, loss_iter_below_to
     return has_converged, loss, iter_below_tol
 
 
-def _uniquify(path):
+def _uniquify(path): # OBSOLETE!
     filename, extension = os.path.splitext(path)
     counter = 1
     while os.path.exists(path):
@@ -262,7 +268,7 @@ def _track_equations(prev_equations_df, model, n, penalize_sample_num, use_best_
     return prev_equations_df
     
     
-def _Search(algorithm, eq, seed, N, N_start, N_stop, xstart, xstop, upper_sigma, lower_sigma, niterations, parentdir, binary_operators, unary_operators, denoise, early_stop, loss_iter_below_tol, step_multiplier, check_if_loss_zero, version, use_best_score, penalize_sample_num, equation_tracking, loss_sample_num, pysr_params):
+def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lower_sigma, niterations, parentdir, binary_operators, unary_operators, denoise, early_stop, loss_iter_below_tol, step_multiplier, check_if_loss_zero, version, use_best_score, penalize_sample_num, equation_tracking, loss_sample_num, pysr_params, warm_start, abs_loss_zero_tol):
     '''
     Takes true equation (eq), generates N data points and searches incrementily over these using the targeted algorithm until N_stop is reached.
     
@@ -286,61 +292,132 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, xstart, xstop, upper_sigma,
                 models.csv
                 samples.csv
     '''
+    parameter_dict = {
+        "algorithm": algorithm,
+        "version": version,
+        "time": None,
+        "converged": False,
+        "last_n" : 0,
+        "equation": eq,
+        "seed": seed,
+        "N_start": N_start,
+        "N_stop": N_stop,
+        "steps": step_multiplier,
+        "boundaries": boundaries,
+        "upper_sigma": upper_sigma,
+        "lower_sigma": lower_sigma,
+        "niterations": niterations,
+        "binary_operators": binary_operators,
+        "unary_operators": unary_operators,
+        "denoise": denoise,
+        "loss_iter_below_tol": loss_iter_below_tol,
+        "equation_tracking": equation_tracking,
+        "early_stop": early_stop,
+        "penalize_sample_num": penalize_sample_num,
+        "use_best_score": use_best_score,
+    }
     # get current time for calculating the execution time
     time_dict = dict()
     time_start_overall = datetime.now()
     
+    # UPDATE: No fixed seed anymore
     np.random.seed(seed)
     rdm.seed(seed)
 
     # Make unique directory
-    dir_name = _uniquify(f"{parentdir}/{algorithm}_v{version}_Sigma{_float_to_str(upper_sigma)}_Num{N_stop}_seed{seed}_{_float_to_str(eq)}")
-    os.makedirs(dir_name)
-
-    # Parse true equation
+    dir_name = f"{parentdir}/{algorithm}"
+    try:
+        os.makedirs(dir_name)
+        warm_start=False
+    except OSError as error:
+        print(error)
+    try:
+        test_set = pd.read_csv(f"{dir_name}/test_set.csv", index_col=0).reset_index(drop=True)
+        samples = pd.read_csv(f"{dir_name}/samples.csv", index_col=0).reset_index(drop=True)
+    except:
+        warm_start = False
+        
+    # Parse true equation   
     f = sympify(str(eq))
     # evaluate data points
     for i in range(len(f.free_symbols)):
         globals()[f'x{i}'] = symbols(f'x{i}')
-    variable_num = np.array([int(str(x).replace("x","")) for x in list(f.free_symbols)]).max()+1
-    X = np.random.uniform(xstart[0], xstop[0], size=(N, 1))
-    if variable_num > 1:
-        for i in range(variable_num)[1:]:
-            X = np.concatenate((X, np.random.uniform(xstart[i], xstop[i], size=(N, 1))), axis=1)
-    X_df, args = _make_args(X, variable_num, f)
-    func = lambdify(list(f.free_symbols), f,'numpy')
-    sigma = np.random.rand(N) * (upper_sigma - lower_sigma) + lower_sigma
-    eps = sigma * np.random.randn(N)
-    y = func(*args) + eps
-
+    #variable_num = np.array([int(str(x).replace("x","")) for x in list(f.free_symbols)]).max()+1
+    variable_num = len(f.free_symbols)
+    variable_list = list(f.free_symbols)
+    func = lambdify(variable_list, f,'numpy')
+    
+    if warm_start:
+        try:
+            with open(f"{dir_name}/parameters.json", 'r') as q:
+                parameters = json.load(q)
+            if parameters["converged"]:
+                return
+        except:
+            pass
+        X = test_set.loc[:, test_set.columns != 'y'].to_numpy()
+        # select last samples (for last n)
+        last_n = np.unique(samples.sample_size)[-1]
+        if last_n == N_stop - 1: # CHANGE 1 TO CURRENT STEPSIZE WITH FUNC _STEPS
+            parameter_dict["last_n"] = int(last_n)
+            with open(f"{dir_name}/parameters.json", "w") as outfile:
+                json.dump(parameter_dict, outfile)
+            return
+        samples = samples.loc[samples.sample_size == last_n]
+        samples = samples.loc[:, samples.columns != 'sample_size'].reset_index(drop=True)
+        N_start = last_n
+    else:
+        X = np.random.uniform(boundaries[variable_list[0]][0], boundaries[variable_list[0]][1], size=(N, 1))
+        if variable_num > 1:
+            for i in range(variable_num)[1:]:
+                X = np.concatenate((X, np.random.uniform(boundaries[variable_list[i]][0], boundaries[variable_list[i]][0], size=(N, 1))), axis=1)
+        sigma = np.random.rand(N) * (upper_sigma - lower_sigma) + lower_sigma
+        eps = sigma * np.random.randn(N)
+        
+    X_df, args = _make_args(X, variable_num, boundaries)
+    y_name = "y" if not warm_start else test_set.columns[-1] # The name for the output variable
     # First sampling
-    test_set = pd.concat([X_df, pd.DataFrame({'y': y})], axis=1)
-    samples = test_set.sample(n=N_start, random_state=seed, ignore_index = False)
-    test_set = test_set.drop(samples.index).reset_index(drop=True)
-    X = np.delete(X, samples.index, axis=0)
-    samples = samples.reset_index(drop=True)
+    if not warm_start:
+        y = func(*args) + eps
+        if 'y' not in df.columns:
+            test_set = pd.concat([X_df, pd.DataFrame({'y': y})], axis=1)
+        else:
+            test_set = pd.concat([X_df, pd.DataFrame({'y_': y})], axis=1)
+            y_name = "y_"
+        samples = test_set.sample(n=N_start, random_state=seed, ignore_index = False)
+        test_set = test_set.drop(samples.index).reset_index(drop=True)
+        X = np.delete(X, samples.index, axis=0)
+        samples = samples.reset_index(drop=True)
 
     output_path= f'{dir_name}/models.csv'
     samples_output_path=f'{dir_name}/samples.csv'
     equations_output_path=f'{dir_name}/equations.csv'
     loss_output_path=f'{dir_name}/loss.csv'
+    #test_set_output_path=f'{dir_name}/test_set.csv'
 
     # define linspace for evaluating the equations
     iter_below_tol, loss = 0, 0
     has_converged = False
     # loss_sample_num is total number of data points to evaluate equations on (for loss)
-    
+    xstart, xstop = [limits[0] for limits in boundaries.values()], [limits[1] for limits in boundaries.values()]
     x_diff = np.random.uniform(xstart, xstop, size=(loss_sample_num, variable_num)) # dataset for loss evaluation
-    X_diff_df, args_diff = _make_args(x_diff, variable_num, f)
+    X_diff_df, args_diff = _make_args(x_diff, variable_num, boundaries)
     
     td_init_time, time_start = td(time_start_overall)
     time_dict["Initialization time"] = td_init_time
     
+    # write 
+    
+                
     # equation tracker
     prev_equations_df = pd.DataFrame(columns=["equation", "occurrence", "location"])
     
     for _N_start, _N_stop, _steps in _Steps(N_start, N_stop, step_multiplier):
         for i, n in enumerate(np.arange(_N_start, _N_stop, _steps, dtype = int)):
+            parameter_dict = {"last_n" : int(n), "time": time_dict}
+            # write parameters in json file
+            with open(f"{dir_name}/parameters.json", "w") as outfile:
+                json.dump(parameter_dict, outfile)
             if i != 0:
                 time_start = datetime.now()
                 if algorithm == "random":
@@ -394,7 +471,7 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, xstart, xstop, upper_sigma,
 
             
             x = samples.iloc[: , :variable_num].to_numpy().reshape(-1,variable_num)
-            y = samples.y.to_numpy().reshape(-1,1)
+            y = samples[y_name].to_numpy().reshape(-1,1)
             
             td_model, time_start = td(time_start)
             time_dict["Algorithm time"] = td_model
@@ -434,11 +511,7 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, xstart, xstop, upper_sigma,
                 saved_equations["sample_size"] = pd.Series(n, index=range(saved_equations.shape[0]))
                 saved_equations.to_csv(equations_output_path, mode='a', header=not os.path.exists(equations_output_path))
             
-            # export samples
-            saved_samples = samples.copy()
-            saved_samples["sample_size"] = pd.Series(saved_samples.shape[0], index=range(saved_samples.shape[0]))
-            saved_samples.to_csv(samples_output_path, mode='a', header=not os.path.exists(samples_output_path))
-
+            
             # export models
             saved_model = model.equations_.copy()
             saved_model["sample_size"] = pd.Series(n, index=range(saved_model.shape[0]))
@@ -450,13 +523,22 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, xstart, xstop, upper_sigma,
             saved_loss = loss_df.copy()
             saved_loss["sample_size"] = pd.Series(n, index=range(saved_loss.shape[0]))
             saved_loss.to_csv(loss_output_path, mode='a', header=not os.path.exists(loss_output_path))
+                        
             
             if early_stop:
-                has_converged, loss, iter_below_tol = check_convergence(model=model, prev_loss=loss, step=n, iter_below_tol=iter_below_tol, loss_iter_below_tol=loss_iter_below_tol, check_if_loss_zero=check_if_loss_zero, loss_df=loss_df)
+                has_converged, loss, iter_below_tol = check_convergence(model=model, prev_loss=loss, step=n, iter_below_tol=iter_below_tol, loss_iter_below_tol=loss_iter_below_tol, check_if_loss_zero=check_if_loss_zero, loss_df=loss_df, abs_loss_zero_tol=abs_loss_zero_tol)
                 if has_converged:
                     break
             if equation_tracking:
                 time_dict["Last equation tracking"] = td_eq_track
+            # save test_set for warm_start
+            saved_test_set = test_set.copy()
+            saved_test_set.to_csv(test_set_output_path, mode='w')
+            
+            # export samples
+            saved_samples = samples.copy()
+            saved_samples["sample_size"] = pd.Series(saved_samples.shape[0], index=range(saved_samples.shape[0]))
+            saved_samples.to_csv(samples_output_path, mode='a', header=not os.path.exists(samples_output_path))
             # write interim parameter json
             parameter_dict = {"last_n" : int(n), "time": time_dict}
             # write parameters in json file
@@ -467,7 +549,10 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, xstart, xstop, upper_sigma,
             break
     
     # calculating the execution time
-    time_dict["Last model fit time"] = td_model
+    try:
+        time_dict["Last model fit time"] = td_model
+    except:
+        time_dict["Last model fit time"] = "error"
     
     if equation_tracking:
         time_dict["Last equation tracking"] = td_eq_track
@@ -475,32 +560,14 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, xstart, xstop, upper_sigma,
     td_exec_time, time_start = td(time_start_overall)
     time_dict["Execution time"] = td_exec_time
     
-    # collect all parameters
-    parameter_dict = {
-        "algorithm": algorithm,
-        "version": version,
-        "time": time_dict,
-        "converged": has_converged,
-        "last_n" : int(n),
-        "equation": eq,
-        "seed": seed,
-        "N_start": N_start,
-        "N_stop": N_stop,
-        "steps": step_multiplier,
-        "xstart": xstart,
-        "xstop": xstop,
-        "upper_sigma": upper_sigma,
-        "lower_sigma": lower_sigma,
-        "niterations": niterations,
-        "binary_operators": binary_operators,
-        "unary_operators": unary_operators,
-        "denoise": denoise,
-        "loss_iter_below_tol": loss_iter_below_tol,
-        "equation_tracking": equation_tracking,
-        "early_stop": early_stop,
-        "penalize_sample_num": penalize_sample_num,
-        "use_best_score": use_best_score,
-    }
+    # update parameters
+    
+    parameter_dict["time"] = time_dict
+    parameter_dict["converged"] = has_converged
+    try:
+        parameter_dict["last_n"] = int(n)
+    except:
+        parameter_dict["last_n"] = "error"
     # write parameters in json file
     with open(f"{dir_name}/parameters.json", "w") as outfile:
         json.dump(parameter_dict, outfile)
