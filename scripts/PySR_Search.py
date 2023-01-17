@@ -19,7 +19,7 @@ _kwargs = {
     "N":10000,
     "N_start":5,
     "N_stop":150,
-    "boundaries":dict("x_0": [0.0, 2.0]),
+    "boundaries":{"x_0":[0.0, 2.0]},
     "upper_sigma":0.5,
     "lower_sigma":0.0,
     "niterations":30,
@@ -196,26 +196,19 @@ def _unique_permutations(iterable, r=None):
             yield p  
 
             
-def _sample(confusion, predictions, step_size, test_set, samples, X):
+def _sample(confusion, predictions, step_size, xy_diff, samples):
+    # step_size >1 and more than 1 equation in predictions
     if step_size > 1 and predictions.shape[1] >= 2:
-        sample = _sample_from_distribution(Y=confusion, X=test_set, sample_size=step_size)
+        sample = _sample_from_distribution(Y=confusion, X=xy_diff, sample_size=step_size)
         samples = samples.append(sample, ignore_index = True)
-        test_set = test_set.drop(sample.index).reset_index(drop=True)
-        X = np.delete(X, sample.index, axis=0)
     # find max diff and map it on X to get x value of max diff
-    elif predictions.shape[1] >= 2: # If there are more than 1 equation predicted
-        max_diff_x = X[np.argmax(confusion)]
-        # add new sample points to max diff area
-        sample = test_set.iloc[(test_set.loc[:, test_set.columns != 'y']-max_diff_x).sum(axis=1).abs().argsort()[:step_size]]
+    elif predictions.shape[1] >= 2 and step_size == 1: # If there are more than 1 equation predicted
+        sample = xy_diff.iloc[np.argmax(confusion)]
         samples = samples.append(sample, ignore_index = True)
-        test_set = test_set.drop(sample.index).reset_index(drop=True)
-        X = np.delete(X, sample.index, axis=0)
     else: # sample randomly
-        sample = test_set.sample(n=step_size, random_state=seed)
+        sample = xy_diff.sample(n=step_size, ignore_index = False)
         samples = samples.append(sample, ignore_index = True)
-        test_set = test_set.drop(sample.index).reset_index(drop=True)
-        X = np.delete(X, sample.index, axis=0)
-    return samples, test_set, X
+    return samples
 
 
 def _track_equations(prev_equations_df, model, n, penalize_sample_num, use_best_score):
@@ -321,8 +314,8 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
     time_start_overall = datetime.now()
     
     # UPDATE: No fixed seed anymore
-    np.random.seed(seed)
-    rdm.seed(seed)
+    #np.random.seed(seed)
+    #rdm.seed(seed)
 
     # Make unique directory
     dir_name = f"{parentdir}/{algorithm}"
@@ -332,7 +325,7 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
     except OSError as error:
         print(error)
     try:
-        test_set = pd.read_csv(f"{dir_name}/test_set.csv", index_col=0).reset_index(drop=True)
+        #test_set = pd.read_csv(f"{dir_name}/test_set.csv", index_col=0).reset_index(drop=True)
         samples = pd.read_csv(f"{dir_name}/samples.csv", index_col=0).reset_index(drop=True)
     except:
         warm_start = False
@@ -344,7 +337,7 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
         globals()[f'x{i}'] = symbols(f'x{i}')
     #variable_num = np.array([int(str(x).replace("x","")) for x in list(f.free_symbols)]).max()+1
     variable_num = len(f.free_symbols)
-    variable_list = list(f.free_symbols)
+    variable_list = list(map(str, list(f.free_symbols)))
     func = lambdify(variable_list, f,'numpy')
     
     if warm_start:
@@ -355,7 +348,6 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
                 return
         except:
             pass
-        X = test_set.loc[:, test_set.columns != 'y'].to_numpy()
         # select last samples (for last n)
         last_n = np.unique(samples.sample_size)[-1]
         if last_n == N_stop - 1: # CHANGE 1 TO CURRENT STEPSIZE WITH FUNC _STEPS
@@ -366,29 +358,29 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
         samples = samples.loc[samples.sample_size == last_n]
         samples = samples.loc[:, samples.columns != 'sample_size'].reset_index(drop=True)
         N_start = last_n
-    else:
-        X = np.random.uniform(boundaries[variable_list[0]][0], boundaries[variable_list[0]][1], size=(N, 1))
+        
+    y_name = "y" if not warm_start else samples.columns[-1] # The name for the output variable
+    
+    #raise Exception(boundaries, type(boundaries), variable_list, type(variable_list[0]))
+    if not warm_start:
+        X = np.random.uniform(boundaries[variable_list[0]][0], boundaries[variable_list[0]][1], size=(N_start, 1))
         if variable_num > 1:
             for i in range(variable_num)[1:]:
-                X = np.concatenate((X, np.random.uniform(boundaries[variable_list[i]][0], boundaries[variable_list[i]][0], size=(N, 1))), axis=1)
-        sigma = np.random.rand(N) * (upper_sigma - lower_sigma) + lower_sigma
-        eps = sigma * np.random.randn(N)
-        
-    X_df, args = _make_args(X, variable_num, boundaries)
-    y_name = "y" if not warm_start else test_set.columns[-1] # The name for the output variable
-    # First sampling
-    if not warm_start:
-        y = func(*args) + eps
-        if 'y' not in df.columns:
-            test_set = pd.concat([X_df, pd.DataFrame({'y': y})], axis=1)
+                X = np.concatenate((X, np.random.uniform(boundaries[variable_list[i]][0], boundaries[variable_list[i]][1], size=(N_start, 1))), axis=1)
+        #sigma = np.random.rand(N_start) * (upper_sigma - lower_sigma) + lower_sigma
+        #eps = sigma * np.random.randn(N_start)
+        X_df, args = _make_args(X, variable_num, boundaries)
+        y = func(*args)# + eps
+        if 'y' not in X_df.columns:
+            samples = pd.concat([X_df, pd.DataFrame({'y': y})], axis=1)
         else:
-            test_set = pd.concat([X_df, pd.DataFrame({'y_': y})], axis=1)
+            samples = pd.concat([X_df, pd.DataFrame({'y_': y})], axis=1)
             y_name = "y_"
-        samples = test_set.sample(n=N_start, random_state=seed, ignore_index = False)
-        test_set = test_set.drop(samples.index).reset_index(drop=True)
-        X = np.delete(X, samples.index, axis=0)
+        #test_set = test_set.drop(samples.index).reset_index(drop=True)
+        #X = np.delete(X, samples.index, axis=0)
         samples = samples.reset_index(drop=True)
-
+        
+        
     output_path= f'{dir_name}/models.csv'
     samples_output_path=f'{dir_name}/samples.csv'
     equations_output_path=f'{dir_name}/equations.csv'
@@ -400,13 +392,10 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
     has_converged = False
     # loss_sample_num is total number of data points to evaluate equations on (for loss)
     xstart, xstop = [limits[0] for limits in boundaries.values()], [limits[1] for limits in boundaries.values()]
-    x_diff = np.random.uniform(xstart, xstop, size=(loss_sample_num, variable_num)) # dataset for loss evaluation
-    X_diff_df, args_diff = _make_args(x_diff, variable_num, boundaries)
+    
     
     td_init_time, time_start = td(time_start_overall)
     time_dict["Initialization time"] = td_init_time
-    
-    # write 
     
                 
     # equation tracker
@@ -420,15 +409,18 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
                 json.dump(parameter_dict, outfile)
             if i != 0:
                 time_start = datetime.now()
+                
+                x_diff = np.random.uniform(xstart, xstop, size=(loss_sample_num, variable_num)) # dataset for loss evaluation
+                x_diff_df, args_diff = _make_args(x_diff, variable_num, boundaries)
+                xy_diff_df = pd.concat([x_diff_df, pd.DataFrame({'y': func(*args_diff)})], axis=1)
                 if algorithm == "random":
-                    # sample from test set
-                    sample = test_set.sample(n=_steps, random_state=seed)
-                    samples = samples.append(sample,  ignore_index = True)
-                    test_set = test_set.drop(sample.index).reset_index(drop=True)
-
+                    # sample random point
+                    sample = xy_diff_df.sample(n=step_size, ignore_index = False)
+                    samples = samples.append(sample, ignore_index = True)
+                
                 if algorithm == "combinatory":
                     time_start = datetime.now()
-                    predictions, best_score_index = _make_predictions(model, X, use_best_score=use_best_score)
+                    predictions, best_score_index = _make_predictions(model, x_diff, use_best_score=use_best_score)
                     # get diff from every permutation:
                     for num, p in enumerate(_unique_permutations(range(predictions.shape[1]), 2)):
                         if num == 0:
@@ -436,39 +428,51 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
                             continue
                         differences = np.append(differences, np.abs(predictions[:,p[0]]-predictions[:,p[1]]).reshape(-1,1), axis=1)
                     differences = differences.sum(axis=1).reshape(-1)
-                    samples, test_set, X = _sample(confusion=differences, predictions=predictions, step_size=_steps, test_set=test_set, samples=samples, X=X)
+                    samples = _sample(confusion=differences, predictions=predictions, step_size=_steps, xy_diff=xy_diff_df, samples=samples)
 
                 if algorithm == "std":
                     # Uses standard deviation as confidence score. Uses best equations
                     time_start = datetime.now()
-                    predictions, best_score_index = _make_predictions(model, X, use_best_score=use_best_score)
+                    predictions, best_score_index = _make_predictions(model, x_diff, use_best_score=use_best_score)
                     std = np.std(predictions, axis=1).reshape(-1)
-                    samples, test_set, X = _sample(confusion=std, predictions=predictions, step_size=_steps, test_set=test_set, samples=samples, X=X)
+                    samples = _sample(confusion=std, predictions=predictions, step_size=_steps, xy_diff=xy_diff_df, samples=samples)
 
                 
                 if algorithm == "complexity-std":
                     # Uses standard deviation as confidence score. Uses best equations
-                    predictions, best_score_index = _make_predictions(model, X, use_best_score=use_best_score)
+                    predictions, best_score_index = _make_predictions(model, x_diff, use_best_score=use_best_score)
                     Sub = np.zeros(predictions.shape)
                     predictions_copy = predictions.copy()
                     for i in range(predictions.shape[0]):
                         Sub[i,:] = np.abs(predictions_copy[i,:] - np.mean(predictions_copy, axis=1)[i])
                     complexity_list = model.equations_.complexity.iloc[best_score_index:].tolist()
                     complexity_std = np.sqrt(np.average(np.square(Sub), axis=1, weights=complexity_list)).reshape(-1)
-                    samples, test_set, X = _sample(confusion=complexity_std, predictions=predictions, step_size=_steps, test_set=test_set, samples=samples, X=X)
+                    samples = _sample(confusion=complexity_std, predictions=predictions, step_size=_steps, xy_diff=xy_diff_df, samples=samples)
                     
                 if algorithm == "loss-std":
                     # Uses standard deviation as confidence score. Uses best equations
                     time_start = datetime.now()
-                    predictions, best_score_index = _make_predictions(model, X, use_best_score=use_best_score)
+                    predictions, best_score_index = _make_predictions(model, x_diff, use_best_score=use_best_score)
                     Sub = np.zeros(predictions.shape)
                     predictions_copy = predictions.copy()
                     for i in range(predictions.shape[0]):
                         Sub[i,:] = np.abs(predictions_copy[i,:] - np.mean(predictions_copy, axis=1)[i])
                     loss_list = model.equations_.loss.iloc[best_score_index:].tolist()
                     loss_std = np.sqrt(np.average(np.square(Sub), axis=1, weights=(1/np.array(loss_list)))).reshape(-1)
-                    samples, test_set, X = _sample(confusion=loss_std, predictions=predictions, step_size=_steps, test_set=test_set, samples=samples, X=X)
+                    samples = _sample(confusion=loss_std, predictions=predictions, step_size=_steps, xy_diff=xy_diff_df, samples=samples)
+                    
+                if algorithm == "true-confusion":
+                    # Uses the true function to get the "true confusion score"
+                    time_start = datetime.now()
+                    predictions, best_score_index = _make_predictions(model, x_diff, use_best_score=use_best_score)
+                    Y = np.tile(xy_diff_df[y_name].to_numpy().reshape(-1,1), predictions.shape[1])
+                    true_confusion = ((Y - predictions)**2).mean(axis=1)
+                    samples = _sample(confusion=true_confusion, predictions=predictions, step_size=_steps, xy_diff=xy_diff_df, samples=samples)
 
+            # export samples
+            saved_samples = samples.copy()
+            saved_samples["sample_size"] = pd.Series(saved_samples.shape[0], index=range(saved_samples.shape[0]))
+            saved_samples.to_csv(samples_output_path, mode='a', header=not os.path.exists(samples_output_path))
             
             x = samples.iloc[: , :variable_num].to_numpy().reshape(-1,variable_num)
             y = samples[y_name].to_numpy().reshape(-1,1)
@@ -532,13 +536,9 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
             if equation_tracking:
                 time_dict["Last equation tracking"] = td_eq_track
             # save test_set for warm_start
-            saved_test_set = test_set.copy()
-            saved_test_set.to_csv(test_set_output_path, mode='w')
+            #saved_test_set = test_set.copy()
+            #saved_test_set.to_csv(test_set_output_path, mode='w')
             
-            # export samples
-            saved_samples = samples.copy()
-            saved_samples["sample_size"] = pd.Series(saved_samples.shape[0], index=range(saved_samples.shape[0]))
-            saved_samples.to_csv(samples_output_path, mode='a', header=not os.path.exists(samples_output_path))
             # write interim parameter json
             parameter_dict = {"last_n" : int(n), "time": time_dict}
             # write parameters in json file
