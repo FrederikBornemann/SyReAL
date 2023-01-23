@@ -15,8 +15,9 @@ import json
 import pandas as pd
 import sympy
 from PySR_Search import Search
+from read_config import read_config
 
-
+config = read_config()
 
 # Create the parser
 parser = argparse.ArgumentParser()

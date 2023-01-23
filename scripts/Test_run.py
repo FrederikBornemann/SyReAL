@@ -1,7 +1,7 @@
 import sys
 import os
 from PySR_Search import Search
-from PySR_Graphics import lossPlotSingle, lossComparisonPlot, Animation
+#from PySR_Graphics import lossPlotSingle, lossComparisonPlot, Animation
 
 # Change cwd to 'home' directory
 import sys, os
@@ -21,39 +21,36 @@ except:
 def indices(lst, item):
     return [i for i, x in enumerate(lst) if x == item]
 
-#equations = ["exp(-((x0/x1)**2)/2)/(2.5*x1)", "exp(-(((x0-x1)/x2)**2)/2)/(2.5*x2)"]
-equations = ["exp(-(((x0-x1)/x2)**2)/2)/(2.5*x2)"]
-#xstop = [[3.0,3.0],[3.0,3.0,3.0]]
-xstop = [[3.0,3.0,3.0]]
-#xstart = [[1.0,1.0],[1.0,1.0,1.0]]
-xstart = [[1.0,1.0,1.0]]
 
+eq = "exp(-((theta-theta1)/sigma)**2/2)/(sqrt(2*3.1415)*sigma)"
+boundaries = {"sigma":[1.0,3.0],"theta":[1.0,3.0],"theta1":[1.0,3.0]}
+seed = 3
+parentdir=f"{os.getcwd()}/Output/Tests/TEST_feynman_algos_{seed}"
+Plots = False
+    
+args = dict(
+    eq=eq,
+    upper_sigma=0.0, 
+    niterations=30, 
+    boundaries=boundaries,
+    parentdir=parentdir, 
+    unary_operators=["neg","square","cube","exp","sqrt","sin","cos","tanh"], 
+    binary_operators=["plus","sub","mult","div"],
+    check_if_loss_zero=True, 
+    N_stop=10,
+    N_start=5,
+    seed=seed,
+    equation_tracking=True,
+    early_stop=False,
+)
+#Search(algorithm="random", **args)
+Search(algorithm="combinatory", **args)
+Search(algorithm="std", **args)
+Search(algorithm="complexity_std", **args)
+Search(algorithm="loss_std", **args)
+Search(algorithm="true_confusion", **args)
 
-
-for seed in [3,4,5,6]:
-    parentdir=f"{os.getcwd()}/Output/Tests/TEST_feynman_algos_{seed}"
-    for i, eq in enumerate(equations):
-        args = dict(
-            eq=eq,
-            upper_sigma=0.0, 
-            niterations=30, 
-            xstop=xstop[i], 
-            xstart=xstart[i], 
-            parentdir=parentdir, 
-            unary_operators=["cos", "exp", "square","sqrt"], 
-            binary_operators=["plus", "mult","div"], 
-            check_if_loss_zero=True, 
-            N_stop=7, 
-            seed=seed,
-            equation_tracking=True,
-            early_stop=False,
-        )
-        Search(algorithm="random", **args)
-        Search(algorithm="combinatory", **args)
-        Search(algorithm="std", **args)
-        Search(algorithm="complexity_std", **args)
-        Search(algorithm="loss_std", **args)
-        pass
+if Plots:
     # Make plots
     subfolders = [ f.path for f in os.scandir(parentdir) if f.is_dir() ]
     for folder in subfolders:
