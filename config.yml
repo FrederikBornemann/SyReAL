@@ -1,5 +1,5 @@
 user:
     maxwellUsername: bornemaf
 directory:
-    outputParentDirectory: /beegfs/desy/user/${maxwellUsername}
+    outputParentDirectory: /beegfs/desy/user/${maxwellUsername}/data/syreal_output
     feynmanDatapoints: /beegfs/desy/user/${maxwellUsername}/Feynman/Feynman_with_units

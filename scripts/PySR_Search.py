@@ -360,6 +360,10 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
                 except IsADirectoryError:
                     shutil.rmtree(dir_name, ignore_errors=True)
     try:
+        os.makedirs(f"{parentdir}/tempdir")
+    except:
+        pass
+    try:
         #test_set = pd.read_csv(f"{dir_name}/test_set.csv", index_col=0).reset_index(drop=True)
         samples = pd.read_csv(f"{dir_name}/samples.csv", index_col=0)
     except:
@@ -548,7 +552,7 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
                 denoise=denoise,
                 model_selection='best',
                 temp_equation_file=True,
-                tempdir=os.getcwd()+"/tempdir",
+                tempdir=parentdir+"/tempdir",
                 **pysr_params,
                 )
             time_start = datetime.now()
@@ -631,6 +635,7 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
     # write parameters in json file
     with open(f"{dir_name}/parameters.json", "w") as outfile:
         json.dump(parameter_dict, outfile)
+    
         
     
 def Search(**kwargs):
