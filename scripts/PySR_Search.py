@@ -43,6 +43,7 @@ _kwargs = {
     "abs_loss_zero_tol": 1e-7,
     "generative": True,
     "dataset": None,
+    "export_confusion_score": False,
     }  
 
 # TODO: 
@@ -288,7 +289,7 @@ def _track_equations(prev_equations_df, model, n, penalize_sample_num, use_best_
     
     
     
-def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lower_sigma, niterations, parentdir, binary_operators, unary_operators, denoise, early_stop, loss_iter_below_tol, step_multiplier, check_if_loss_zero, version, use_best_score, penalize_sample_num, equation_tracking, loss_sample_num, pysr_params, warm_start, abs_loss_zero_tol, generative, dataset):
+def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lower_sigma, niterations, parentdir, binary_operators, unary_operators, denoise, early_stop, loss_iter_below_tol, step_multiplier, check_if_loss_zero, version, use_best_score, penalize_sample_num, equation_tracking, loss_sample_num, pysr_params, warm_start, abs_loss_zero_tol, generative, dataset, export_confusion_score):
     '''
     Takes true equation (eq), generates N data points and searches incrementily over these using the targeted algorithm until N_stop is reached.
     
@@ -438,6 +439,7 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
     samples_output_path=f'{dir_name}/samples.csv'
     equations_output_path=f'{dir_name}/equations.csv'
     loss_output_path=f'{dir_name}/loss.csv'
+    cs_output_path=f'{dir_name}/cs'
     #test_set_output_path=f'{dir_name}/test_set.csv'
 
     # define linspace for evaluating the equations
@@ -489,15 +491,15 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
                             differences = np.abs(predictions[:,p[0]]-predictions[:,p[1]]).reshape(-1,1)
                             continue
                         differences = np.append(differences, np.abs(predictions[:,p[0]]-predictions[:,p[1]]).reshape(-1,1), axis=1)
-                    differences = differences.sum(axis=1).reshape(-1)
-                    samples = _sample(confusion=differences, predictions=predictions, step_size=_steps, x_diff=x_diff, xy_diff=xy_diff_df, samples=samples, generative=generative)
+                    confusion = differences.sum(axis=1).reshape(-1)
+                    samples = _sample(confusion=confusion, predictions=predictions, step_size=_steps, x_diff=x_diff, xy_diff=xy_diff_df, samples=samples, generative=generative)
 
                 if algorithm == "std":
                     # Uses standard deviation as confidence score. Uses best equations
                     time_start = datetime.now()
                     predictions, best_score_index = _make_predictions(model, x_diff, use_best_score=use_best_score)
-                    std = np.std(predictions, axis=1).reshape(-1)
-                    samples = _sample(confusion=std, predictions=predictions, step_size=_steps, x_diff=x_diff, xy_diff=xy_diff_df, samples=samples, generative=generative)
+                    confusion = np.std(predictions, axis=1).reshape(-1)
+                    samples = _sample(confusion=confusion, predictions=predictions, step_size=_steps, x_diff=x_diff, xy_diff=xy_diff_df, samples=samples, generative=generative)
 
                 
                 if algorithm == "complexity-std":
@@ -508,8 +510,8 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
                     for i in range(predictions.shape[0]):
                         Sub[i,:] = np.abs(predictions_copy[i,:] - np.mean(predictions_copy, axis=1)[i])
                     complexity_list = model.equations_.complexity.iloc[best_score_index:].tolist()
-                    complexity_std = np.sqrt(np.average(np.square(Sub), axis=1, weights=complexity_list)).reshape(-1)
-                    samples = _sample(confusion=complexity_std, predictions=predictions, step_size=_steps, x_diff=x_diff, xy_diff=xy_diff_df, samples=samples, generative=generative)
+                    confusion = np.sqrt(np.average(np.square(Sub), axis=1, weights=complexity_list)).reshape(-1)
+                    samples = _sample(confusion=confusion, predictions=predictions, step_size=_steps, x_diff=x_diff, xy_diff=xy_diff_df, samples=samples, generative=generative)
                     
                 if algorithm == "loss-std":
                     # Uses standard deviation as confidence score. Uses best equations
@@ -520,24 +522,33 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
                     for i in range(predictions.shape[0]):
                         Sub[i,:] = np.abs(predictions_copy[i,:] - np.mean(predictions_copy, axis=1)[i])
                     loss_list = model.equations_.loss.iloc[best_score_index:].tolist()
-                    loss_std = np.sqrt(np.average(np.square(Sub), axis=1, weights=(1/np.array(loss_list)))).reshape(-1)
-                    samples = _sample(confusion=loss_std, predictions=predictions, step_size=_steps, x_diff=x_diff, xy_diff=xy_diff_df, samples=samples, generative=generative)
+                    confusion = np.sqrt(np.average(np.square(Sub), axis=1, weights=(1/np.array(loss_list)))).reshape(-1)
+                    samples = _sample(confusion=confusion, predictions=predictions, step_size=_steps, x_diff=x_diff, xy_diff=xy_diff_df, samples=samples, generative=generative)
                     
                 if algorithm == "true-confusion":
                     # Uses the true function to get the "true confusion score"
                     time_start = datetime.now()
                     predictions, best_score_index = _make_predictions(model, x_diff, use_best_score=use_best_score)
                     Y = np.tile(xy_diff_df[y_name].to_numpy().reshape(-1,1), predictions.shape[1])
-                    true_confusion = ((Y - predictions)**2).mean(axis=1)
-                    samples = _sample(confusion=true_confusion, predictions=predictions, step_size=_steps, x_diff=x_diff, xy_diff=xy_diff_df, samples=samples, generative=generative)
+                    confusion = ((Y - predictions)**2).mean(axis=1)
+                    samples = _sample(confusion=confusion, predictions=predictions, step_size=_steps, x_diff=x_diff, xy_diff=xy_diff_df, samples=samples, generative=generative)
 
-            # drop samples out of dataset_df
-            dataset_df = dataset_df.drop(samples.index, errors="ignore")
+            if not generative: # drop samples out of dataset_df
+                dataset_df = dataset_df.drop(samples.index, errors="ignore")
+            
+            # export confusion score
+            if export_confusion_score and i>0:
+                if not os.path.exists(cs_output_path):
+                    os.makedirs(cs_output_path)
+                cs = pd.DataFrame(confusion.copy(), columns = ['cs'])
+                saved_cs = pd.concat([x_diff_df, cs], axis=1)
+                saved_cs.to_csv(f"{cs_output_path}/cs_{int(n)}.csv", mode='w')
+            
             # export samples
             saved_samples = samples.copy()
             saved_samples["sample_size"] = pd.Series(saved_samples.shape[0], index=range(saved_samples.shape[0]))
             saved_samples.to_csv(samples_output_path, mode='a', header=not os.path.exists(samples_output_path))
-            
+
             x = samples.iloc[: , :variable_num].to_numpy().reshape(-1,variable_num)
             y = samples[y_name].to_numpy().reshape(-1,1)
             
