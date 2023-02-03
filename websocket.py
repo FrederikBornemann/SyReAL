@@ -2,6 +2,8 @@ import asyncio
 import json
 import websockets
 
+MATTERMOST_WEBHOOK = "https://mattermost.web.cern.ch/hooks/z4wfd61uni8j8c7eneph6ftjbr"
+
 async def handle_connection(websocket, path):
     # Receive data from the client
     data = await websocket.recv()

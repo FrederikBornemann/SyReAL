@@ -1,0 +1,15 @@
+GENERAL:
+  JobName: template_job
+  JobNumber: 4
+  NodeNumber: 4
+  Output: "test_jobs/${JobName}"
+  kwargs: {eq: "2*x0+sin(x1)", boundaries: {x0: [0.0,3.0], x1: [0.0,3.0]}}
+  slurm_kwargs: {mincpu: 60}
+
+JOBS:
+  1-2:
+    kwargs: {eq: "1/(2*x0)", boundaries: {x0: [0.0,3.0]}, early_stop: False}
+    slurm_kwargs: {}
+  3-4:
+    kwargs: {early_stop: True}
+    slurm_kwargs: {}
