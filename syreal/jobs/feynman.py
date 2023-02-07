@@ -42,7 +42,7 @@ class FeynmanProblem(Problem):
         self.low = [float(row[f"v{i+1}_low"]) for i in range(self.n_vars)]
         self.high = [float(row[f"v{i+1}_high"]) for i in range(self.n_vars)]
         self.boundaries = {name: [float(low), float(high)] for name, low, high in zip(self.variable_names, self.low, self.high)}
-        self.dp = row["datapoints"]
+        self.dp = int(row["datapoints"])
 
     def __str__(self):
         return f"Feynman Equation: {self.eq_id}|Form: {self.form}"

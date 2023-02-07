@@ -1,0 +1,25 @@
+GENERAL:
+  Role: HEAD
+  JobName: FeynmanTrials
+  NodeNumber: 10
+  Output: "${JobName}"
+  kwargs: {    
+    niterations: 30,
+    early_stop: True,
+    step_multiplier: {0: 1},
+    use_best_score: True,
+    pysr_params: {populations: 20},
+    abs_loss_zero_tol: 1e-7,
+  }
+  slurm_kwargs: {mincpu: 60}
+  
+
+JOBS:
+  all:
+    job_type: Feynman
+    job_type_args: {
+      equation_number: [1,100],
+      n_trials: 100, 
+      algorihms: ["random", "combinatory", "std", "loss-std", "complexity-std", "true-confusion"], 
+      filter: {datapoints: "<=1000"},
+      }

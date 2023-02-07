@@ -43,17 +43,4 @@ def read_config(path=CONFIG):
         return
     else:
         return substitute_vars(config, config)
-        # replace variable placeholders with variable values (${variable} -> variable_value)
-        # var_dict = dict()
-        # for section, items in config.items():
-        #     try:
-        #         values = items.values()
-        #     except:
-        #         continue
-        #     for var, value in items.items():
-        #         template = string.Template(value)
-        #         value = template.safe_substitute(var_dict)
-        #         var_dict[var] = value
-        #         config[section][var] = value
-        # return config
     return None
