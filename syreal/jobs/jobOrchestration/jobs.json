@@ -1,0 +1,298 @@
+{
+    "equations": {
+        "eq1": {
+            "status": "finished",
+            "parameters": {
+                "num": 20
+            },
+            "trials": {
+                "algo1": {
+                    "0": {
+                        "status": "finished",
+                        "node": "h112"
+                    },
+                    "1": {
+                        "status": "pending",
+                        "node": "h113"
+                    },
+                    "2": {
+                        "status": "running",
+                        "node": "h114"
+                    },
+                    "3": {
+                        "status": "pending",
+                        "node": "h115"
+                    },
+                    "4": {
+                        "status": "pending",
+                        "node": "h116"
+                    },
+                    "5": {
+                        "status": "pending",
+                        "node": "h117"
+                    },
+                    "6": {
+                        "status": "pending",
+                        "node": "h118"
+                    }
+                },
+                "algo2": {
+                    "0": {
+                        "status": "finished",
+                        "node": "h112"
+                    },
+                    "1": {
+                        "status": "pending",
+                        "node": "h113"
+                    },
+                    "2": {
+                        "status": "running",
+                        "node": "h114"
+                    },
+                    "3": {
+                        "status": "pending",
+                        "node": "h115"
+                    },
+                    "4": {
+                        "status": "pending",
+                        "node": "h116"
+                    },
+                    "5": {
+                        "status": "pending",
+                        "node": "h117"
+                    },
+                    "6": {
+                        "status": "pending",
+                        "node": "h118"
+                    }
+                },
+                "algo3": {
+                    "0": {
+                        "status": "pending",
+                        "node": "h112"
+                    },
+                    "1": {
+                        "status": "pending",
+                        "node": "h113"
+                    },
+                    "2": {
+                        "status": "pending",
+                        "node": "h114"
+                    },
+                    "3": {
+                        "status": "pending",
+                        "node": "h115"
+                    },
+                    "4": {
+                        "status": "pending",
+                        "node": "h116"
+                    },
+                    "5": {
+                        "status": "pending",
+                        "node": "h117"
+                    },
+                    "6": {
+                        "status": "pending",
+                        "node": "h118"
+                    }
+                }
+            }
+        },
+        "eq2": {
+            "status": "pending",
+            "parameters": {
+                "num": 20
+            },
+            "trials": {
+                "algo1": {
+                    "0": {
+                        "status": "finished",
+                        "node": "h112"
+                    },
+                    "1": {
+                        "status": "pending",
+                        "node": "h113"
+                    },
+                    "2": {
+                        "status": "running",
+                        "node": "h114"
+                    },
+                    "3": {
+                        "status": "pending",
+                        "node": "h115"
+                    },
+                    "4": {
+                        "status": "pending",
+                        "node": "h116"
+                    },
+                    "5": {
+                        "status": "pending",
+                        "node": "h117"
+                    },
+                    "6": {
+                        "status": "pending",
+                        "node": "h118"
+                    }
+                },
+                "algo2": {
+                    "0": {
+                        "status": "pending",
+                        "node": "h112"
+                    },
+                    "1": {
+                        "status": "pending",
+                        "node": "h113"
+                    },
+                    "2": {
+                        "status": "pending",
+                        "node": "h114"
+                    },
+                    "3": {
+                        "status": "pending",
+                        "node": "h115"
+                    },
+                    "4": {
+                        "status": "pending",
+                        "node": "h116"
+                    },
+                    "5": {
+                        "status": "pending",
+                        "node": "h117"
+                    },
+                    "6": {
+                        "status": "pending",
+                        "node": "h118"
+                    }
+                },
+                "algo3": {
+                    "0": {
+                        "status": "pending",
+                        "node": "h112"
+                    },
+                    "1": {
+                        "status": "pending",
+                        "node": "h113"
+                    },
+                    "2": {
+                        "status": "pending",
+                        "node": "h114"
+                    },
+                    "3": {
+                        "status": "pending",
+                        "node": "h115"
+                    },
+                    "4": {
+                        "status": "pending",
+                        "node": "h116"
+                    },
+                    "5": {
+                        "status": "pending",
+                        "node": "h117"
+                    },
+                    "6": {
+                        "status": "pending",
+                        "node": "h118"
+                    }
+                }
+            }
+        },
+        "eq3": {
+            "status": "running",
+            "parameters": {
+                "num": 20
+            },
+            "trials": {
+                "algo1": {
+                    "0": {
+                        "status": "pending",
+                        "node": "h112"
+                    },
+                    "1": {
+                        "status": "pending",
+                        "node": "h113"
+                    },
+                    "2": {
+                        "status": "pending",
+                        "node": "h114"
+                    },
+                    "3": {
+                        "status": "stopped",
+                        "node": "h115"
+                    },
+                    "4": {
+                        "status": "pending",
+                        "node": "h116"
+                    },
+                    "5": {
+                        "status": "pending",
+                        "node": "h117"
+                    },
+                    "6": {
+                        "status": "pending",
+                        "node": "h118"
+                    }
+                },
+                "algo2": {
+                    "0": {
+                        "status": "stopped",
+                        "node": "h112"
+                    },
+                    "1": {
+                        "status": "pending",
+                        "node": "h113"
+                    },
+                    "2": {
+                        "status": "pending",
+                        "node": "h114"
+                    },
+                    "3": {
+                        "status": "pending",
+                        "node": "h115"
+                    },
+                    "4": {
+                        "status": "pending",
+                        "node": "h116"
+                    },
+                    "5": {
+                        "status": "pending",
+                        "node": "h117"
+                    },
+                    "6": {
+                        "status": "pending",
+                        "node": "h118"
+                    }
+                },
+                "algo3": {
+                    "0": {
+                        "status": "pending",
+                        "node": "h112"
+                    },
+                    "1": {
+                        "status": "pending",
+                        "node": "h113"
+                    },
+                    "2": {
+                        "status": "pending",
+                        "node": "h114"
+                    },
+                    "3": {
+                        "status": "pending",
+                        "node": "h115"
+                    },
+                    "4": {
+                        "status": "pending",
+                        "node": "h116"
+                    },
+                    "5": {
+                        "status": "pending",
+                        "node": "h117"
+                    },
+                    "6": {
+                        "status": "pending",
+                        "node": "h118"
+                    }
+                }
+            }
+        }
+    }
+}
