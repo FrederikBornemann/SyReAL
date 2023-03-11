@@ -2,9 +2,10 @@
 
 from pathlib import Path
 import json
-import hashlib
+
 import time
 
+from id_generation import generate_id
 
 # make a time function to use as a decorator
 def timeit(func):
@@ -15,20 +16,6 @@ def timeit(func):
         print(f"Time taken by {func.__name__}: {end - start} seconds")
         return result
     return wrapper
-
-
-def generate_trial_id(param1, param2, param3):
-    # Generate a unique ID for a trial
-    # Concatenate the parameters into a single string
-    param_string = str(param1) + str(param2) + str(param3)
-    # Create a SHA-256 hash object
-    hash_object = hashlib.sha256()
-    # Encode the parameter string as bytes and update the hash object
-    hash_object.update(param_string.encode())
-    # Get the hexadecimal representation of the hash
-    hex_digest = hash_object.hexdigest()
-    # Return the first 8 characters of the hash as the ticket ID
-    return hex_digest[:8]
 
 
 def flatten_job_list(job_list, skip_finished=True, skip_running=True):
@@ -47,7 +34,7 @@ def flatten_job_list(job_list, skip_finished=True, skip_running=True):
                 if skip_running and trial_dict["status"] == "running":
                     continue
                 yield {
-                    generate_trial_id(trial, eq, algo): {
+                    generate_id(trial, eq, algo, n=8): {
                         "trial": trial,
                         "equation": eq,
                         "algorithm": algo,
@@ -101,10 +88,3 @@ def make_priority_queue(job_list, number_of_jobs=5):
                                  for i in range(number_of_jobs)], flatten_jobs)
     return trials
 
-
-DIR = Path(__file__).parents[0]
-with open(DIR/"jobs.json", "r") as f:
-    job_list = json.load(f)
-
-trials = make_priority_queue(job_list, number_of_jobs=2)
-print(trials)
