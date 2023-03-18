@@ -1,6 +1,6 @@
 # TODO
-# [] read job list
-# [] make job tickets
+# [x] read job list
+# [x] make job tickets
 # [] spawn jobs
 # [] update job list
 
@@ -17,14 +17,10 @@ import pandas as pd
 
 from priority_queue import make_priority_queue, get_trials_from_ids
 from id_generation import generate_id
+from monitor import check_SLURM_monitor, get_SLURM_monitor, print_jobs_as_table
 
 
-PKG_DIR = Path(__file__).parents[3]
-JOBS_DIR = Path(os.environ.get('JOB_ORCHESTRATION_WORKSPACE'))
-JOB_LIST = JOBS_DIR / "job_list.json"
-JOB_TICKETS = JOBS_DIR / "job_tickets"
-SLURM_USER = os.environ.get('SLURM_USER')
-SLURM_PARTITION = os.environ.get('SLURM_PARTITION')
+from constants import JOB_LIST, JOB_TICKETS, SLURM_USER, SLURM_PARTITION
 
 
 def read_job_list():
@@ -53,19 +49,20 @@ def write_job_tickets(queue, num_jobs):
         id = generate_id(*all_ids, n=8)
         with open(JOB_TICKETS / f"job_ticket_{id}.json", "w+") as file:
             json.dump(ticket, file)
-
-def monitor_worker_nodes():
-    monitor = [x.split() for x in str(subprocess.Popen( ['squeue','-u','bornemaf','-p','allcpu'], stdout=subprocess.PIPE ).communicate()[0]).split(r'\n')[1:-1]]
-    # place every entry in the list into a dictionary with keys: jobid, partition, name, user, state, time, nodes, nodelist
-    monitor = [dict(zip(['jobid', 'partition', 'name', 'user', 'state', 'time', 'nodes', 'nodelist'], x)) for x in monitor]
-    # convert the jobid and nodes columns to integers
-    for x in monitor:
-        x['jobid'] = int(x['jobid'])
-        x['nodes'] = int(x['nodes'])
-    # convert monitor to pandas dataframe
-    monitor = pd.DataFrame(monitor)
-    return monitor
     
+def start_job_orchestrator():
+    import signal
+    import sys
+
+    def sigterm_handler(signum, frame):
+        print("Received SIGTERM signal. Exiting...")
+        sys.exit(0)
+
+    # Set the signal handler for SIGTERM
+    signal.signal(signal.SIGTERM, sigterm_handler)
+
+    # Start the job orchestrator
+    pass
 
 if __name__ == "__main__":
     # Create a file lock
@@ -81,9 +78,14 @@ if __name__ == "__main__":
     clear_job_tickets()
     # write job tickets
     write_job_tickets(queue, num_jobs=2)
-    # get worker nodes
-    monitor = monitor_worker_nodes()
-    print(monitor)
+    # monitor
+    # get the SLURM monitor
+    monitor = get_SLURM_monitor()
+    while True:
+        # check the SLURM monitor
+        monitor, changed, changed_rows, alerts = check_SLURM_monitor(monitor)
+        # print the jobs as a table
+        print_jobs_as_table(monitor, alerts)
     
     
     
