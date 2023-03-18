@@ -10,3 +10,5 @@ SLURM_USER = os.environ.get('SLURM_USER')
 SLURM_PARTITION = os.environ.get('SLURM_PARTITION')
 PID_DIR = TEMP_DIR / "pid"
 PID_FILE = PID_DIR / "job_scheduler.pid"
+PID_LOGS_DIR = TEMP_DIR / "logs"
+PID_LOG_FILE = PID_LOGS_DIR / "job_scheduler.log"

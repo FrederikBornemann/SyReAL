@@ -14,9 +14,11 @@ import json
 from pathlib import Path
 import fasteners
 import pandas as pd
+import time
+import logging
 
 from priority_queue import make_priority_queue, get_trials_from_ids
-from id_generation import generate_id
+from utils import generate_id, Logger
 from monitor import check_SLURM_monitor, get_SLURM_monitor, print_jobs_as_table
 
 
@@ -54,14 +56,28 @@ def start_job_orchestrator():
     import signal
     import sys
 
+    logger, keep_fds = Logger(add_handler=False)
+
     def sigterm_handler(signum, frame):
         print("Received SIGTERM signal. Exiting...")
+        # TODO: terminate the spawner, wait for the current job to finish, and then exit
+        # save the last
+        sys.exit(0)
+    
+    def sigusr1_handler(signum, frame):
+        print("Received SIGUSR1 signal. Exiting...")
+        # TODO: Kill all jobs, delete all job tickets, and erase all started (but not finished) job files
         sys.exit(0)
 
-    # Set the signal handler for SIGTERM
+    # Set the signal handler for SIGTERM and SIGKILL
     signal.signal(signal.SIGTERM, sigterm_handler)
+    signal.signal(signal.SIGUSR1, sigusr1_handler)
 
     # Start the job orchestrator
+    logger.info("Job orchestrator started.")
+    
+    time.sleep(60)
+    logger.info("Job orchestrator finished.")
     pass
 
 if __name__ == "__main__":

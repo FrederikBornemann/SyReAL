@@ -5,7 +5,7 @@ import json
 
 import time
 
-from id_generation import generate_id
+from utils import generate_id
 
 # make a time function to use as a decorator
 def timeit(func):
