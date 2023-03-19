@@ -1,15 +1,14 @@
 import argparse
 import os
 import sys
-from pathlib import Path
 
-from constants import PID_DIR, PID_FILE, TEMP_DIR, JOB_TICKETS, PID_LOG_FILE, PID_LOGS_DIR
+from constants import PID_DIR, PID_FILE, TEMP_DIR, JOB_TICKETS, PID_LOG_FILE, PID_LOGS_DIR, WORKER_NUM
 
-import daemonize
-import signal
-import logging
 
-from utils import Logger
+
+
+from monitor import get_SLURM_monitor, check_SLURM_monitor, print_jobs_as_table, get_worker_number
+
 
 
 def __setupDirectoryStructure():
@@ -33,6 +32,8 @@ def is_running():
             return False
 
 def start():
+    import daemonize
+    from utils import Logger
     def start_daemon():
         from job_orchestrator import start_job_orchestrator
         print("Starting job orchestration")
@@ -49,11 +50,37 @@ def start():
 
 
 def monitor():
+    import time
+    from monitor import get_SLURM_monitor, check_SLURM_monitor, print_jobs_as_table, get_worker_number
+    import threading
     print("Monitoring job orchestration")
-    # TODO: print the monitor, wait for user input, and then exit1
-
+    # TODO: print the monitor, wait for user input, and then exit
+    # create a flag to stop the while loop
+    stop_flag = threading.Event()
+    # define your while loop function
+    def while_loop():
+        monitor = get_SLURM_monitor()
+        while not stop_flag.is_set():
+            monitor, changed, changed_rows, alerts = check_SLURM_monitor(monitor)
+            print_jobs_as_table(monitor, alerts)
+            print(f"Worker number: {get_worker_number()}/{WORKER_NUM}")
+            print("\nPress enter to exit.")
+            time.sleep(3)
+    # create a separate thread for the while loop
+    while_thread = threading.Thread(target=while_loop)
+    # start the while loop thread
+    while_thread.start()
+    # wait for the user to press enter
+    input("Press enter to stop the loop...")
+    # set the stop flag to stop the while loop
+    stop_flag.set()
+    # wait for the while loop thread to finish
+    while_thread.join()
+        
+        
 
 def stop():
+    import signal
     # check if the daemon is running, if so stop it
     if not is_running():
         print("Job scheduler is not running.")
@@ -76,14 +103,19 @@ def stop():
         else:
             print("Daemon was not stopped.")
 
+
+########## MAIN ##########
+from monitor import get_worker_number
+# Define actions, help, and colors
 actions = [start, stop, monitor]
-actionHelp = ["Start the job scheduler", "Stop the job scheduler. (terminate or kill)", "Monitor the job scheduler"]
+actionHelp = ["Start the job scheduler", "Stop the job scheduler (stop or kill jobs)", "Monitor the jobs"]
 colors = ["\033[92m", "\033[91m", "\033[93m"]
-# print status of daemon in green if running, red if not
+# Print status table
+print("\nSTATUS\t\tWORKERS\t\tPROGRESS")
 if is_running():
-    print("\nJob-Scheduler status: \033[92mrunning\033[0m\n")
+    print(f"\033[92mRunning\033[0m\t\t({get_worker_number()}/{WORKER_NUM})\t\t[0 %]\n")
 else:
-    print("\nJob-Scheduler status: \033[91mnot running\033[0m\n")
+    print(f"\033[91mStopped\033[0m\t\t({get_worker_number()}/{WORKER_NUM})\t\t[0 %]\n")
 parser = argparse.ArgumentParser()
 parser.add_argument("-action", type=str)
 args = parser.parse_known_args()[0]

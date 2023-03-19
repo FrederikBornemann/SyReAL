@@ -1,0 +1,10 @@
+WORKER_NUM: 10
+PARALLEL_PROCS: 2
+WORKER_TIMEOUT: 7200
+SCHEDULER_INTERVAL: 30
+
+EMAIL: "syreal_jobs@outlook.com"
+JOBS_DIR: "/beegfs/desy/user/bornemaf/data/syreal_output/job_testing"
+SLURM_USER: "bornemaf"
+SLURM_PARTITION: "allcpu"
+PYTHON_SCRIPT_FILE: "parallel.py"

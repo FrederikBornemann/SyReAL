@@ -30,8 +30,6 @@ def get_SLURM_monitor():
     return monitor
 
 # check if SLURM queue has changed and return the changed rows in the queue
-
-
 def check_SLURM_monitor(monitor):
     new_monitor = get_SLURM_monitor()
 
@@ -78,19 +76,11 @@ def check_SLURM_monitor(monitor):
                 updated_jobs[name] = 'queued'
     return new_monitor, not changed_rows.empty, changed_rows, updated_jobs
 
+def get_worker_number():
+    return get_SLURM_monitor().shape[0]
 
-def loop_SLURM_monitor():
-    monitor = get_SLURM_monitor()
-    while True:
-        monitor, changed, changed_rows, alerts = check_SLURM_monitor(monitor)
-        if changed:
-            #print('changed rows', changed_rows)
-            #print('alerts', alerts)
-            pass
-
-        # print('.')
-        print_jobs_as_table(monitor, alerts)
-        time.sleep(3)
+def get_worker_names():
+    return get_SLURM_monitor()['name'].values
 
 
 def print_jobs_as_table(job_df, alerts):
@@ -105,6 +95,8 @@ def print_jobs_as_table(job_df, alerts):
     colors = {"R": "\033[92m", "CG": "\033[91m", "PD": "\033[93m", "CF": "\033[93m", "CD": "\033[93m", "F": "\033[93m",
               "TO": "\033[93m", "NF": "\033[93m", "RV": "\033[93m", "SE": "\033[93m", "S": "\033[93m", "UNK": "\033[93m"}
 
+    colors_alert = {"started": "\033[92m", "completed": "\033[94m", "stopped": "\033[91m", "failed": "\033[91m", "preempted": "\033[91m", "queued": "\033[93m"}
+
     # Update the table with colored values
     # index of the state column
     state_index = job_df.columns.get_loc("state")
@@ -118,8 +110,4 @@ def print_jobs_as_table(job_df, alerts):
     print(table)
     if len(alerts) > 0:
         for name, alert in alerts.items():
-            print(f"job {name} is {alert}")
-
-
-if __name__ == "__main__":
-    loop_SLURM_monitor()
+            print(f"\033[1m{name} is {colors_alert[alert]}{alert}\033[0m\033[0m")

@@ -1,22 +1,4 @@
-
-
-from pathlib import Path
-import json
-
-import time
-
 from utils import generate_id
-
-# make a time function to use as a decorator
-def timeit(func):
-    def wrapper(*args, **kwargs):
-        start = time.time()
-        result = func(*args, **kwargs)
-        end = time.time()
-        print(f"Time taken by {func.__name__}: {end - start} seconds")
-        return result
-    return wrapper
-
 
 def flatten_job_list(job_list, skip_finished=True, skip_running=True):
     # Flatten the job list
