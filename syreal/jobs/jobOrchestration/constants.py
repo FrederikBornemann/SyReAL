@@ -15,7 +15,7 @@ except Exception:
 for key, value in config.items():
     globals()[key] = value
 
-JOBS_DIR = Path(JOBS_DIR)
+JOBS_DIR = Path(config['JOBS_DIR'])
 TEMP_DIR = JOBS_DIR / "tmp"
 JOB_LIST = JOBS_DIR / "job_list.json"
 JOB_TICKETS = JOBS_DIR / "job_tickets"
@@ -24,5 +24,8 @@ PID_FILE = PID_DIR / "job_scheduler.pid"
 PID_LOGS_DIR = TEMP_DIR / "logs"
 PID_LOG_FILE = PID_LOGS_DIR / "job_scheduler.log"
 SLURM_TEMPLATE_FILE = PKG_DIR / "slurm_template.sh"
+WORKER_MANAGER_PICKLE_FILE = TEMP_DIR / "worker_manager.pickle"
+FEYNMAN_CSV_FILE = PKG_DIR / "feynman.csv"
+WORKER_OUTPUT_DIR = JOBS_DIR / "data"
 
 

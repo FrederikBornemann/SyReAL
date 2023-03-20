@@ -1,25 +1,14 @@
-# TODO
-# [x] read job list
-# [x] make job tickets
-# [] spawn jobs
-# [] update job list
-
-
-# This is the main job orchestrator. It is responsible for spawning jobs and updating the job list.
-# It is also responsible for spawning the job monitor, which is responsible for monitoring the jobs
-
 import time
-
 
 from priority_queue import make_priority_queue
 from utils import Logger
 from monitor import get_worker_number
-from worker import WorkerManager, Worker
+from worker import WorkerManager, Worker, load_worker_manager, delete_pickle_file
 from email_scraper import check_for_new_events
-from job_list_handler import validate_jobs, read_job_list, clear_job_tickets, write_job_tickets
-
+from job_list_handler import validate_jobs, read_job_list, clear_job_tickets, write_job_tickets, update_jobs_status, generate_data_dirs
 
 from constants import WORKER_NUM, PARALLEL_PROCS, SCHEDULER_INTERVAL
+
 
 def start_job_orchestrator():
     import signal
@@ -27,17 +16,24 @@ def start_job_orchestrator():
 
     logger, keep_fds = Logger(add_handler=False)
 
+    # Load WorkerManager from pickle file
+    WorkerManager = load_worker_manager()
+
     def sigterm_handler(signum, frame):
         logger.critical(
             "Received TERMINATION signal. Exiting the job orchestrator killing all jobs...")
-        # TODO: terminate the spawner, wait for the current job to finish, and then exit
-        # save the last
-        sys.exit(0)
+        # Terminate the spawner, wait for the current job to finish, and then exit
+        global terminate
+        terminate = True
+        # The terminate flag will be checked in the main loop, if it is True and the running jobs are finished, the job orchestrator will exit
 
     def sigusr1_handler(signum, frame):
         logger.critical(
             "Received EXITING signal. Exiting the job orchestrator but not killing any jobs...")
-        # TODO: Kill all jobs, delete all job tickets, and mark all running jobs as stopped
+        # Kill all jobs, delete all job tickets, and mark all running jobs as stopped, delete WorkerManager pickle file
+        WorkerManager.delete_all_workers()
+        delete_pickle_file()
+        clear_job_tickets(all=True)
         sys.exit(0)
 
     # Set the signal handler for SIGTERM and SIGKILL
@@ -47,7 +43,14 @@ def start_job_orchestrator():
     # Start the job orchestrator
     logger.info("Job orchestrator has started.")
 
+    # Generate the data directories
+    logger.info("Generating data directories...")
+    generate_data_dirs()
 
+    # Set the terminate flag to False
+    terminate = False
+
+    logger.info("Starting the job orchestrator main loop...")
     # MAIN LOOP
     while True:
         start_time = time.time()
@@ -69,12 +72,19 @@ def start_job_orchestrator():
                     
                 elif alert['status'] in ['FAILED', 'CANCELLED', 'TIMEOUT']:
                     logger.error(
-                        f"Job {alert['job_id']} with job ticket {alert['name']} got status {str(alert['status'])}.")
-                    # TODO: mark all not finished jobs in the job ticket as stopped
+                        f"Job {alert['job_id']} with job ticket {alert['name']} got status {str(alert['status'])}. Marking all running jobs from {alert['name']} as 'stopped'.")
+                    # mark all running jobs from the stopped worker as 'stopped'
+                    update_jobs_status(alert['name'], 'running', 'stopped')
                     WorkerManager.delete_worker(alert['name'])
+            WorkerManager.save()
 
-        if get_worker_number() >= WORKER_NUM:
+        num_running_workers = get_worker_number()
+        if (num_running_workers >= WORKER_NUM) or terminate:
             # if the number of workers is greater than or equal to the maximum number of workers, wait for a worker to finish
+            if (num_running_workers == 0) and terminate:
+                # if there are no workers running and the terminate flag is set, exit the job orchestrator
+                logger.info("All jobs have finished. Exiting the job orchestrator.")
+                sys.exit(0)
             continue
 
         # AFTER THIS POINT, A NEW WORKER CAN BE ADDED
@@ -101,6 +111,8 @@ def start_job_orchestrator():
                     f"Worker {name} was not added to the queue. Timeout.")
                 continue
             worker.update_status("running")
+            WorkerManager.save()
+
 
         # wait if the time taken is less than the scheduler interval, otherwise, continue
         end_time = time.time()

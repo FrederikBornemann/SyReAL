@@ -17,4 +17,4 @@
 source ~/.bashrc
 conda activate PySR
 cd $SYREAL_PKG_DIR
-python $PYTHON_SCRIPT_FILE
+python $PYTHON_SCRIPT_FILE --worker_name=$JOB_NAME

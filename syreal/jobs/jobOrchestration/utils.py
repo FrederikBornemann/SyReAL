@@ -1,5 +1,3 @@
-
-
 # this function generates a unique ID for a number of parameters and returns the first n characters of the hash
 def generate_id(*params, n=8):
     import hashlib
@@ -28,5 +26,4 @@ def Logger(add_handler=True):
         logger.addHandler(handler)
     keep_fds = [handler.stream.fileno()]
     return logger, keep_fds
-
 

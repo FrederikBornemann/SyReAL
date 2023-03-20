@@ -12,7 +12,6 @@ from sympy.core.rules import Transform
 import shutil
 
 
-print("Testing!!")
 # VERSION 20
 
 _kwargs = {
@@ -289,7 +288,10 @@ def _track_equations(prev_equations_df, model, n, penalize_sample_num, use_best_
     
     
     
-def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lower_sigma, niterations, parentdir, binary_operators, unary_operators, denoise, early_stop, loss_iter_below_tol, step_multiplier, check_if_loss_zero, version, use_best_score, penalize_sample_num, equation_tracking, loss_sample_num, pysr_params, warm_start, abs_loss_zero_tol, generative, dataset, export_confusion_score):
+def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lower_sigma, niterations, parentdir, 
+            binary_operators, unary_operators, denoise, early_stop, loss_iter_below_tol, step_multiplier, check_if_loss_zero, 
+            version, use_best_score, penalize_sample_num, equation_tracking, loss_sample_num, pysr_params, warm_start, 
+            abs_loss_zero_tol, generative, dataset, export_confusion_score):
     '''
     Takes true equation (eq), generates N data points and searches incrementily over these using the targeted algorithm until N_stop is reached.
     
@@ -346,8 +348,9 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
     #np.random.seed(seed)
     #rdm.seed(seed)
 
+
     # Make unique directory
-    dir_name = f"{parentdir}/{algorithm}"
+    dir_name = parentdir
     try:
         os.makedirs(dir_name)
         warm_start=False
@@ -404,12 +407,16 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
     
     #raise Exception(boundaries, type(boundaries), variable_list, type(variable_list[0]))
     if (not warm_start and generative):
+        # generate random starting points
+        # To make it fair, we set the random seed for the starting points, so they are the same for every algorithm
+        np.random.seed(seed)
         X = np.random.uniform(boundaries[variable_list[0]][0], boundaries[variable_list[0]][1], size=(N_start, 1))
         if variable_num > 1:
             for i in range(variable_num)[1:]:
                 X = np.concatenate((X, np.random.uniform(boundaries[variable_list[i]][0], boundaries[variable_list[i]][1], size=(N_start, 1))), axis=1)
         #sigma = np.random.rand(N_start) * (upper_sigma - lower_sigma) + lower_sigma
         #eps = sigma * np.random.randn(N_start)
+        np.random.seed()    # reset random seed
         X_df, args = _make_args(X, variable_num, boundaries)
         y = func(*args)# + eps
         if 'y' not in X_df.columns:

@@ -1,7 +1,8 @@
 import subprocess
 import time
+import pickle
 
-from constants import TEMP_DIR, SLURM_TEMPLATE_FILE, SLURM_PARTITION, WORKER_TIMEOUT, PARALLEL_PROCS, EMAIL, SYREAL_PKG_DIR, PYTHON_SCRIPT_FILE
+from constants import TEMP_DIR, SLURM_TEMPLATE_FILE, SLURM_PARTITION, WORKER_TIMEOUT, PARALLEL_PROCS, EMAIL, SYREAL_PKG_DIR, PYTHON_SCRIPT_FILE, WORKER_MANAGER_PICKLE_FILE
 from utils import Logger
 from monitor import get_worker_names
 
@@ -14,11 +15,15 @@ class Worker:
         self.job_id = None
         self.status = None
 
-    def update_status(self, status):
-        from job_list_handler import write_job_list
-        self.status = status
-        jobs_running = [dict(worker_name=self.name, name=str(list(job.keys())[0]), status=status) for job in self.jobs]
-        write_job_list(jobs_running)
+    def update_status(self, new_status, prev_status=None):
+        from job_list_handler import write_job_list, update_jobs_status
+        self.status = new_status
+        if not prev_status:
+            jobs_running = [dict(params=list(job.values())[0], status=new_status) for job in self.jobs]
+            write_job_list(jobs_running, params_given=True)
+        else:
+            update_jobs_status(self.name, prev_status, new_status)
+        
 
 
     def start(self):
@@ -66,7 +71,7 @@ class Worker:
             logger.error(f"Failed to submit job to SLURM. Error: {err}")
             return False
         else:
-            self.update_status("stopped")
+            self.update_status(new_status="stopped", prev_status="running")
             return True
 
     def await_queue(self):
@@ -87,16 +92,19 @@ class Worker:
         return True
     
     
-
-
-
 class WorkerManager:
     def __init__(self):
         self.workers = []
 
+    # save worker manager as a pickle file
+    def save(self):
+        with open(WORKER_MANAGER_PICKLE_FILE, "wb") as file:
+            pickle.dump(self, file)
+
     def add_worker(self, name, jobs):
         worker = Worker(name, jobs)
         self.workers.append(worker)
+        self.save()
         return worker
 
     def get_workers(self):
@@ -120,7 +128,6 @@ class WorkerManager:
         else:
             return True, [], []
         
-
     def delete_worker(self, name):
         for worker in self.workers:
             if worker.name == name:
@@ -132,3 +139,15 @@ class WorkerManager:
         for worker in self.workers:
             worker.stop()
         self.workers = []
+
+    
+def load_worker_manager():
+    if not WORKER_MANAGER_PICKLE_FILE.exists():
+        return WorkerManager()
+    with open(WORKER_MANAGER_PICKLE_FILE, "rb") as file:
+        WorkerManager = pickle.load(file)
+    return WorkerManager
+
+def delete_pickle_file():
+    if WORKER_MANAGER_PICKLE_FILE.exists():
+        WORKER_MANAGER_PICKLE_FILE.unlink()
