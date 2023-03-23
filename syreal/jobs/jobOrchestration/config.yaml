@@ -1,7 +1,7 @@
 # SCHEDULER CONFIG
-WORKER_NUM: 10
-PARALLEL_PROCS: 2
-WORKER_TIMEOUT: 7200
+WORKER_NUM: 2
+PARALLEL_PROCS: 60
+WORKER_TIMEOUT: "05:00:00"
 SCHEDULER_INTERVAL: 30
 
 # USER CONFIG
@@ -9,11 +9,13 @@ EMAIL: "syreal_jobs@outlook.com"
 JOBS_DIR: "/beegfs/desy/user/bornemaf/data/syreal_output/job_testing"
 SLURM_USER: "bornemaf"
 SLURM_PARTITION: "allcpu"
-PYTHON_SCRIPT_FILE: "parallel.py"
+PYTHON_SCRIPT: "parallel.py"
+ENV: "PySR"
 
 # JOB CONFIG
 JOB_STATUS: ["running", "finished", "stopped", "pending"]
 
 # SYREAL CONFIG
-LOSS_THRESHOLD: 1e-7
+LOSS_THRESHOLD: 1.e-7
 MAX_ITERATIONS: 500
+PROCS: 0 # 0 = no multithreading. Every process will run on a single thread

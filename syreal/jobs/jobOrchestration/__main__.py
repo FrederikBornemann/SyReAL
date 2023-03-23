@@ -2,17 +2,11 @@ import argparse
 import os
 import sys
 
-from constants import PID_DIR, PID_FILE, TEMP_DIR, JOB_TICKETS, PID_LOG_FILE, PID_LOGS_DIR, WORKER_NUM
-
-
-
-
+from constants import PID_DIR, PID_FILE, TEMP_DIR, JOB_TICKETS, PID_LOGS_DIR, WORKER_NUM, WORKER_LOGS_DIR, WORKER_OUTPUT_DIR
 from monitor import get_SLURM_monitor, check_SLURM_monitor, print_jobs_as_table, get_worker_number
 
-
-
 def __setupDirectoryStructure():
-    requiredLocations = [TEMP_DIR, PID_DIR, PID_LOGS_DIR, JOB_TICKETS]
+    requiredLocations = [TEMP_DIR, PID_DIR, PID_LOGS_DIR, JOB_TICKETS, WORKER_OUTPUT_DIR, WORKER_LOGS_DIR]
     for loc in requiredLocations:
         if not os.path.exists(loc):
             os.makedirs(loc)
@@ -54,7 +48,6 @@ def monitor():
     from monitor import get_SLURM_monitor, check_SLURM_monitor, print_jobs_as_table, get_worker_number
     import threading
     print("Monitoring job orchestration")
-    # TODO: print the monitor, wait for user input, and then exit
     # create a flag to stop the while loop
     stop_flag = threading.Event()
     # define your while loop function
@@ -90,18 +83,16 @@ def stop():
     with open(PID_FILE, "r") as f:
         pid = int(f.read().strip())
     # ask user if they want the daemon to finish the current job before stopping
-    userInput = input("Do you want the job scheduler to finish the current jobs before stopping? (y/n): ")
-    if userInput.lower() == "y" or userInput.lower() == "yes" or userInput.lower() == "":
+    print("Stopping job scheduler...\n\t0: Stop the job scheduler immediately.\n\t1: Stop the job scheduler after the current job is finished.\n")
+    userInput = input("Select an option: ")
+    if userInput.lower() == "0":
         # Send a SIGTERM signal to the process
+        print("Exiting immediately...")
+        os.kill(pid, signal.SIGTERM)
+    elif userInput.lower() == "1":
+        # Send a SIGUSR1 signal to the process
+        print("Stopping job scheduler, exiting after the current job is finished...")
         os.kill(pid, signal.SIGUSR1)
-    elif userInput.lower() == "n" or userInput.lower() == "no":
-        # ask for confirmation
-        userInput = input("Are you sure you want to kill all running jobs? (y/n): ")
-        if userInput.lower() == "y" or userInput.lower() == "yes":
-            # Send a SIGKILL signal to the process
-            os.kill(pid, signal.SIGTERM)
-        else:
-            print("Daemon was not stopped.")
 
 
 ########## MAIN ##########
@@ -111,6 +102,7 @@ actions = [start, stop, monitor]
 actionHelp = ["Start the job scheduler", "Stop the job scheduler (stop or kill jobs)", "Monitor the jobs"]
 colors = ["\033[92m", "\033[91m", "\033[93m"]
 # Print status table
+# TODO: add progress percentage
 print("\nSTATUS\t\tWORKERS\t\tPROGRESS")
 if is_running():
     print(f"\033[92mRunning\033[0m\t\t({get_worker_number()}/{WORKER_NUM})\t\t[0 %]\n")

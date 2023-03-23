@@ -564,7 +564,7 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
 
             # fit model on sample
             model = PySRRegressor(
-                niterations=niterations,
+                # niterations=niterations,
                 binary_operators=binary_operators,
                 unary_operators=unary_operators,
                 denoise=denoise,
@@ -654,6 +654,7 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
     with open(f"{dir_name}/parameters.json", "w") as outfile:
         json.dump(parameter_dict, outfile)
     
+    return has_converged, int(n), time_dict["Execution time"]
         
     
 def Search(**kwargs):
@@ -661,4 +662,4 @@ def Search(**kwargs):
     del kwargs["algorithm"]
     for i, v in kwargs.items():
         _kwargs[i]=v
-    _Search(algorithm=algorithm, **_kwargs)
+    return _Search(algorithm=algorithm, **_kwargs)

@@ -1,12 +1,14 @@
 import subprocess
 import time
 import pickle
+import os
 
-from constants import TEMP_DIR, SLURM_TEMPLATE_FILE, SLURM_PARTITION, WORKER_TIMEOUT, PARALLEL_PROCS, EMAIL, SYREAL_PKG_DIR, PYTHON_SCRIPT_FILE, WORKER_MANAGER_PICKLE_FILE
+from constants import TEMP_DIR, SLURM_TEMPLATE_FILE, SLURM_PARTITION, WORKER_TIMEOUT, PARALLEL_PROCS, EMAIL, JOBS_DIR, PYTHON_SCRIPT_FILE, WORKER_MANAGER_PICKLE_FILE, WORKER_LOGS_DIR, ENV
 from utils import Logger
 from monitor import get_worker_names
 
 logger, keep_fds = Logger()
+
 
 class Worker:
     def __init__(self, name, jobs):
@@ -16,15 +18,16 @@ class Worker:
         self.status = None
 
     def update_status(self, new_status, prev_status=None):
+        """Update the status of the worker and write the job list to the job list file. If prev_status is given, update the status of the jobs that have prev_status to new_status."""
         from job_list_handler import write_job_list, update_jobs_status
         self.status = new_status
         if not prev_status:
-            jobs_running = [dict(params=list(job.values())[0], status=new_status) for job in self.jobs]
+            jobs_running = [dict(params=list(job.values())[
+                                 0], status=new_status) for job in self.jobs]
             write_job_list(jobs_running, params_given=True)
         else:
             update_jobs_status(self.name, prev_status, new_status)
-        
-
+            pass
 
     def start(self):
         def write_worker_script(variables, filename):
@@ -42,33 +45,40 @@ class Worker:
             return script_path
         script_path = write_worker_script(variables=dict(
             JOB_NAME=self.name,
-            PARTITION=SLURM_PARTITION,
-            TIMEOUT=WORKER_TIMEOUT,
-            N_CPUS=PARALLEL_PROCS,
-            EMAIL=EMAIL,
-            SYREAL_PKG_DIR=SYREAL_PKG_DIR,
-            PYTHON_SCRIPT_FILE=PYTHON_SCRIPT_FILE,
+            PARTITION=str(SLURM_PARTITION),
+            TIMEOUT=str(WORKER_TIMEOUT),
+            N_CPUS=str(PARALLEL_PROCS),
+            EMAIL=str(EMAIL),
+            DIR=str(JOBS_DIR),
+            PYTHON_SCRIPT_FILE=str(PYTHON_SCRIPT_FILE),
+            WORKER_LOGS_DIR=str(WORKER_LOGS_DIR),
+            ENV=str(ENV),
+            TIME=str(time.strftime("%H-%M-%S", time.localtime())),
         ), filename=f"{self.name}.sh")
 
         # Submit shell script to SLURM
         cmd = ["sbatch", script_path]
-        # TODO: delete script after submission
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = process.communicate()
         if process.returncode != 0:
             logger.error(f"Failed to submit job to SLURM. Error: {err}")
-        
+            return False
         # Extract job ID from output
         self.job_id = out.decode().strip().split(" ")[-1]
         logger.info(f"Submitted job with ID {self.job_id} to SLURM.")
+        # delete script after submission
+        os.remove(script_path)
 
     def stop(self):
         # Cancel job
         cmd = ["scancel", self.job_id]
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = process.communicate()
         if process.returncode != 0:
-            logger.error(f"Failed to submit job to SLURM. Error: {err}")
+            logger.error(
+                f"Failed to cancel job with ID {self.job_id} ({self.name}) from SLURM . Error: {err}")
             return False
         else:
             self.update_status(new_status="stopped", prev_status="running")
@@ -79,10 +89,12 @@ class Worker:
         start_time = time.time()
         while True:
             cmd = ["squeue", "-j", self.job_id]
-            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            process = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = process.communicate()
             if process.returncode != 0:
-                logger.error(f"Failed to get job status from SLURM. Error: {err}")
+                logger.error(
+                    f"Failed to get job status from SLURM. Error: {err}")
             # Check if job is in queue
             if len(out.decode().strip().split("\n")) > 1:
                 break
@@ -90,8 +102,8 @@ class Worker:
                 return False
             time.sleep(5)
         return True
-    
-    
+
+
 class WorkerManager:
     def __init__(self):
         self.workers = []
@@ -109,44 +121,61 @@ class WorkerManager:
 
     def get_workers(self):
         return self.workers
-    
+
     def get_worker(self, name):
         for worker in self.workers:
             if worker.name == name:
                 return worker
         return None
-    
+
     def validate(self):
         worker_names = set([worker.name for worker in self.workers])
-        SLURM_worker_names = set(get_worker_names())
+        SLURM_worker_names = set(get_worker_names(exclude_CG=True))
         # Check if any workers are missing
-        mismatched_entries = list(SLURM_worker_names.symmetric_difference(worker_names))
-        missing, extra = [mismatched_entries[:len(mismatched_entries)//2], mismatched_entries[len(mismatched_entries)//2:]]
+        mismatched_entries = list(
+            SLURM_worker_names.symmetric_difference(worker_names))
+        missing, extra = [mismatched_entries[:len(
+            mismatched_entries)//2], mismatched_entries[len(mismatched_entries)//2:]]
         if len(mismatched_entries) > 0:
-            logger.error(f"Worker names do not match. Running but not registered: {missing}, Registered but not running: {extra}")
+            logger.error(
+                f"Worker names do not match. Running but not registered: {missing}, Registered but not running: {extra}")
             return False, missing, extra
         else:
             return True, [], []
-        
-    def delete_worker(self, name):
-        for worker in self.workers:
-            if worker.name == name:
-                worker.stop()
-                self.workers.remove(worker)
-                break
-    
-    def delete_all_workers(self):
-        for worker in self.workers:
-            worker.stop()
-        self.workers = []
 
-    
+    def delete_worker(self, name):
+        if not isinstance(name, list):
+            name = [name]
+        workers = self.workers.copy()
+        for worker in workers:
+            if worker.name in name:
+                result = worker.stop()
+                if result:
+                    logger.debug(f"Stopped worker with name {worker.name}.")
+                    self.workers.remove(worker)
+                    self.save()
+                yield result
+
+    def delete_all_workers(self):
+        workers = [worker.name for worker in self.workers]
+        logger.debug(f"Stopping workers with names {workers}.")
+        stopping_success = list(self.delete_worker(workers))
+        if not all(stopping_success):
+            workers_not_stopped = [workers[i] for i, success in enumerate(
+                stopping_success) if not success]
+            logger.error(
+                f"Failed to stop workers with names {workers_not_stopped}.")
+            return False
+        return True
+
+
 def load_worker_manager():
     if not WORKER_MANAGER_PICKLE_FILE.exists():
         return WorkerManager()
     with open(WORKER_MANAGER_PICKLE_FILE, "rb") as file:
-        WorkerManager = pickle.load(file)
-    return WorkerManager
+        Worker_Manager = pickle.load(file)
+    return Worker_Manager
+
 
 def delete_pickle_file():
     if WORKER_MANAGER_PICKLE_FILE.exists():

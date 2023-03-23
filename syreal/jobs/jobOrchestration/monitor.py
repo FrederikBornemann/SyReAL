@@ -79,7 +79,9 @@ def check_SLURM_monitor(monitor):
 def get_worker_number():
     return get_SLURM_monitor().shape[0]
 
-def get_worker_names():
+def get_worker_names(exclude_CG=False):
+    if exclude_CG:
+        return get_SLURM_monitor()[get_SLURM_monitor()['state'] != 'CG']['name'].values
     return get_SLURM_monitor()['name'].values
 
 

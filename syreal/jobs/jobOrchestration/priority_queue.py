@@ -22,6 +22,7 @@ def flatten_job_list(job_list, skip_finished=True, skip_running=True):
                         "algorithm": algo,
                         "status": trial_dict["status"],
                         "equation_status": eq_dict["status"],
+                        "equation_params": eq_dict["parameters"],
                         # "progress": trial_dict["progress"],
                     }
                 }
@@ -53,7 +54,7 @@ def get_trials_from_ids(trial_ids, flatten_job_list):
     # the time complexity of this is O(n^2) but it's not a big deal
 
 
-def make_priority_queue(job_list, number_of_jobs=5):
+def make_priority_queue(job_list, number_of_jobs):
     # Flatten the job list
     flatten_jobs = list(flatten_job_list(job_list))
     # Create a priority queue

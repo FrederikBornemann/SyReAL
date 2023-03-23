@@ -16,6 +16,7 @@ for key, value in config.items():
     globals()[key] = value
 
 JOBS_DIR = Path(config['JOBS_DIR'])
+PYTHON_SCRIPT = config['PYTHON_SCRIPT']
 TEMP_DIR = JOBS_DIR / "tmp"
 JOB_LIST = JOBS_DIR / "job_list.json"
 JOB_TICKETS = JOBS_DIR / "job_tickets"
@@ -27,5 +28,7 @@ SLURM_TEMPLATE_FILE = PKG_DIR / "slurm_template.sh"
 WORKER_MANAGER_PICKLE_FILE = TEMP_DIR / "worker_manager.pickle"
 FEYNMAN_CSV_FILE = PKG_DIR / "feynman.csv"
 WORKER_OUTPUT_DIR = JOBS_DIR / "data"
+WORKER_LOGS_DIR = JOBS_DIR / "logs"
+PYTHON_SCRIPT_FILE = PKG_DIR / PYTHON_SCRIPT
 
 
