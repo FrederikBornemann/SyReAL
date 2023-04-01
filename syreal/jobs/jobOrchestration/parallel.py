@@ -1,5 +1,4 @@
-from default_kwargs import default_syreal_kwargs, default_pysr_kwargs
-from syreal import Search
+# fmt: off
 import concurrent.futures
 import argparse
 
@@ -14,7 +13,8 @@ from job_list_handler import write_job_list
 import sys
 parent_dir = SYREAL_PKG_DIR / "syreal"
 sys.path.insert(0, str(parent_dir))
-
+from default_kwargs import default_syreal_kwargs, default_pysr_kwargs
+from syreal import Search
 
 logger, keepfds = Logger(add_handler=False)
 
@@ -101,3 +101,5 @@ for future in concurrent.futures.as_completed(futures):
         break
 executor.shutdown(wait=True)
 # All the jobs are done now
+
+# fmt: on

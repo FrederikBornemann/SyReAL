@@ -71,11 +71,12 @@ def monitor():
             print(
                 f"Worker number: \033[1m\033[93m{get_worker_number()}/{WORKER_NUM}\033[0m")
             try:
-                progress_finished, progress_running = get_progress()
+                progress_finished, progress_running = get_progress(
+                    percent=True)
             except:
                 progress_finished, progress_running = 0, 0
             print(
-                f"Progress: \033[1m\033[94m{round(progress_finished,2)}\033[0m % finished, \033[1m\033[92m{round(progress_running,2)}\033[0m % running\033[0m")
+                f"Progress: \033[1m\033[94m{round(progress_finished,5)}\033[0m % finished, \033[1m\033[92m{round(progress_running,5)}\033[0m % running\033[0m")
             print("\n\033[91mPress enter to exit.\033[0m")
             sleep_time = 10
             for i in range(sleep_time):

@@ -43,6 +43,7 @@ _kwargs = {
     "generative": True,
     "dataset": None,
     "export_confusion_score": False,
+    "testing": False,
 }
 
 # TODO:
@@ -311,7 +312,7 @@ def _track_equations(prev_equations_df, model, n, penalize_sample_num, use_best_
 def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lower_sigma, niterations, parentdir,
             binary_operators, unary_operators, denoise, early_stop, loss_iter_below_tol, step_multiplier, check_if_loss_zero,
             version, use_best_score, penalize_sample_num, equation_tracking, loss_sample_num, pysr_params, warm_start,
-            abs_loss_zero_tol, generative, dataset, export_confusion_score):
+            abs_loss_zero_tol, generative, dataset, export_confusion_score, testing):
     '''
     Takes true equation (eq), generates N data points and searches incrementily over these using the targeted algorithm until N_stop is reached.
 
@@ -412,7 +413,7 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
         except:
             pass
         # select last samples (for last n)
-        last_n = np.unique(samples.sample_size)[-1]
+        last_n = int(np.unique(samples.sample_size)[~np.isnan(np.unique(samples.sample_size))][-1])
         if last_n >= (N_stop - 1):  # CHANGE 1 TO CURRENT STEPSIZE WITH FUNC _STEPS
             parameter_dict["last_n"] = int(last_n)
             with open(f"{dir_name}/parameters.json", "w") as outfile:
@@ -487,7 +488,12 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
     prev_equations_df = pd.DataFrame(
         columns=["equation", "occurrence", "location"])
 
+    print(f"Starting with {N_start} samples")  # DEBUG
+    print(f"Stopping at {N_stop} samples")  # DEBUG
+    print(f"Step size multiplier: {step_multiplier}")  # DEBUG
     for _N_start, _N_stop, _steps in _Steps(N_start, N_stop, step_multiplier):
+        # DEBUG
+        print(f"N_start: {_N_start}, N_stop: {_N_stop}, steps: {_steps}")
         for i, n in enumerate(np.arange(_N_start, _N_stop, _steps, dtype=int)):
             parameter_dict = {"last_n": int(n), "time": time_dict}
             # write parameters in json file
@@ -608,6 +614,9 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
 
             td_model, time_start = td(time_start)
             time_dict["Algorithm time"] = td_model
+
+            if testing:
+                return
 
             # fit model on sample
             model = PySRRegressor(

@@ -192,7 +192,6 @@ def start_job_orchestrator():
                 if terminate:
                     break
 
-
         # wait if the time taken is less than the scheduler interval, otherwise, continue
         time_taken = time.time() - start_time
         if time_taken < SCHEDULER_INTERVAL:
