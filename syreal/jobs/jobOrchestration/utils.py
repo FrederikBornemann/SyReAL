@@ -27,3 +27,14 @@ def Logger(add_handler=True):
     keep_fds = [handler.stream.fileno()]
     return logger, keep_fds
 
+import timeit
+
+def timeit_wrapper(func):
+    def wrapper(*args, **kwargs):
+        start_time = timeit.default_timer()
+        result = func(*args, **kwargs)
+        end_time = timeit.default_timer()
+        print("Function {} took {} seconds to execute.".format(func.__name__, end_time - start_time))
+        return result
+    return wrapper
+

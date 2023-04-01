@@ -24,7 +24,7 @@
 #     },
 # }
 
-from constants import FEYNMAN_CSV_FILE, JOB_LIST
+from constants import FEYNMAN_CSV_FILE, JOB_LIST, WORKER_OUTPUT_DIR
 import csv
 import json
 import numpy as np
@@ -39,6 +39,28 @@ def import_feynman_csv(ignore_equations=[]):
     for eq in ignore_equations:
         equations.remove(eq)
     return equations
+
+def read_worker_output_dir(job_list):
+    for eq in job_list["equations"]:
+        for algo in job_list["equations"][eq]["trials"]:
+            for trial in job_list["equations"][eq]["trials"][algo]:
+                try:
+                    with open(WORKER_OUTPUT_DIR / eq / algo / str(trial) / f"parameters.json", "r") as f:
+                        params = json.load(f)
+                except:
+                    continue
+                else:
+                    try:
+                        params["converged"]
+                    except:
+                        job_list["equations"][eq]["trials"][algo][trial]["status"] = "stopped"
+                    else:
+                        if params["converged"]:
+                            job_list["equations"][eq]["trials"][algo][trial]["status"] = "finished"
+                            job_list["equations"][eq]["trials"][algo][trial]["converged"] = params["converged"]
+                            job_list["equations"][eq]["trials"][algo][trial]["iterations"] = params["last_n"]
+                            job_list["equations"][eq]["trials"][algo][trial]["exec_time"] = params["time"]["Execution time"]                     
+    return job_list
 
 def generate_job_list(algorithms, trials, pysr_kwargs, kwargs, ignore_equations=[], equations=[]):
     if not equations:
@@ -71,8 +93,11 @@ def generate_job_list(algorithms, trials, pysr_kwargs, kwargs, ignore_equations=
             for i, eq in enumerate(equations)
         },
     }
+    # Read the worker output directory to update the status of the jobs
+    job_list = read_worker_output_dir(job_list)
     with open(JOB_LIST, "w") as f:
-        json.dump(job_list, f, indent=4)
+        # dump so that the json file is human readable, but small
+        json.dump(job_list, f)
 
 
 def make_parameters_grid(parameters:dict[str, list]):
@@ -88,6 +113,12 @@ def make_parameters_grid(parameters:dict[str, list]):
         grid_list.append(param_dict)
 
     return grid_list
+
+def clear_backups():
+    from constants import JOB_LIST_BACKUP_DIR
+    # remove all files in JOB_LIST_BACKUP_DIR
+    for file in JOB_LIST_BACKUP_DIR.iterdir():
+        file.unlink()
 
 if __name__ == "__main__":
     #algorithms = ["random", "combinatory", "std", "complexity-std", "loss-std", "true-confusion"]
@@ -105,7 +136,9 @@ if __name__ == "__main__":
     equations = []
     equations=["I.6.2b" for i in range(len(pysr_kwargs))]
     ignore_equations = []
-    generate_job_list(algorithms, 15, pysr_kwargs, kwargs, ignore_equations, equations=equations)
+    trials_per_algorithm = 15
+    generate_job_list(algorithms, trials_per_algorithm, pysr_kwargs, kwargs, ignore_equations, equations=equations)
+    clear_backups()
 
 
 

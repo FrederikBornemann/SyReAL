@@ -23,6 +23,9 @@ def flatten_job_list(job_list, skip_finished=True, skip_running=True):
                         "status": trial_dict["status"],
                         "equation_status": eq_dict["status"],
                         "equation_params": eq_dict["parameters"],
+                        "iterations": trial_dict["iterations"],
+                        "exec_time": trial_dict["exec_time"],
+                        "converged": trial_dict["converged"],
                         # "progress": trial_dict["progress"],
                     }
                 }

@@ -3,9 +3,9 @@ import time
 import pickle
 import os
 
-from constants import TEMP_DIR, SLURM_TEMPLATE_FILE, SLURM_PARTITION, WORKER_TIMEOUT, PARALLEL_PROCS, EMAIL, JOBS_DIR, PYTHON_SCRIPT_FILE, WORKER_MANAGER_PICKLE_FILE, WORKER_LOGS_DIR, ENV
+from constants import TEMP_DIR, SLURM_TEMPLATE_FILE, SLURM_PARTITION, WORKER_TIMEOUT, PARALLEL_PROCS, EMAIL, JOBS_DIR, PYTHON_SCRIPT_FILE, WORKER_MANAGER_PICKLE_FILE, WORKER_LOGS_DIR, ENV, SLURM_USER
 from utils import Logger
-from monitor import get_worker_names
+from monitor import get_worker_names, get_worker_ids
 
 logger, keep_fds = Logger()
 
@@ -62,15 +62,20 @@ class Worker:
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = process.communicate()
         if process.returncode != 0:
-            logger.error(f"Failed to submit job to SLURM. Error: {err}")
+            logger.error(
+                f"Failed to submit job {self.name} to SLURM. Error: {err}")
             return False
         # Extract job ID from output
         self.job_id = out.decode().strip().split(" ")[-1]
-        logger.info(f"Submitted job with ID {self.job_id} to SLURM.")
+        logger.info(
+            f"Submitted job {self.name} with ID {self.job_id} to SLURM.")
         # delete script after submission
         os.remove(script_path)
 
     def stop(self):
+        # Update job list. This is done before because the worker can stop itself.
+        # If the worker stops itself before updateing the job list, the job list will not be updated.
+        self.update_status(new_status="stopped", prev_status="running")
         # Cancel job
         cmd = ["scancel", self.job_id]
         process = subprocess.Popen(
@@ -81,7 +86,6 @@ class Worker:
                 f"Failed to cancel job with ID {self.job_id} ({self.name}) from SLURM . Error: {err}")
             return False
         else:
-            self.update_status(new_status="stopped", prev_status="running")
             return True
 
     def await_queue(self):
@@ -94,7 +98,7 @@ class Worker:
             out, err = process.communicate()
             if process.returncode != 0:
                 logger.error(
-                    f"Failed to get job status from SLURM. Error: {err}")
+                    f"Failed to get job status from SLURM (job {self.name}). Error: {err}")
             # Check if job is in queue
             if len(out.decode().strip().split("\n")) > 1:
                 break
@@ -121,6 +125,9 @@ class WorkerManager:
 
     def get_workers(self):
         return self.workers
+
+    def get_worker_names(self):
+        return [worker.name for worker in self.workers]
 
     def get_worker(self, name):
         for worker in self.workers:
@@ -167,6 +174,33 @@ class WorkerManager:
                 f"Failed to stop workers with names {workers_not_stopped}.")
             return False
         return True
+
+    def kill_all_jobs(self):
+        """Kill all jobs and update job list from "running" to "stopped"."""
+        from job_list_handler import update_all_running_to_stopped
+        # Cancel all jobs
+        results = []
+        job_ids = get_worker_ids(exclude_CG=True)
+        for job_id in job_ids:
+            cmd = ["scancel", job_id]
+            process = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            out, err = process.communicate()
+            if process.returncode != 0:
+                logger.error(
+                    f"Failed to cancel job with ID {job_id} from SLURM. Error: {err}")
+                results.append(False)
+        if all(results):
+            logger.debug("Successfully killed all jobs.")
+            self.workers = []
+            self.save()
+            update_all_running_to_stopped()
+            return True
+        else:
+            logger.error("Failed to kill all jobs.")
+            self.workers = []
+            self.save()
+            return False
 
 
 def load_worker_manager():

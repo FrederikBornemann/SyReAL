@@ -1,12 +1,16 @@
 from worker import Worker, WorkerManager, load_worker_manager
 from typing import List, Dict, Union
-from utils import Logger
+from utils import Logger, generate_id
+import json
+import fasteners
+import os.path
+import time
+from constants import JOB_LIST, JOB_TICKETS, JOB_STATUS, WORKER_OUTPUT_DIR, JOB_LIST_BACKUP_DIR
 logger, keep_fds = Logger(add_handler=False)
 
 
 def clear_job_tickets(name=None, all=False):
     """Clears the job tickets directory. If name is specified, only the job ticket with that name is deleted. If all is True, all job tickets are deleted."""
-    from constants import JOB_TICKETS
     for ticket in JOB_TICKETS.glob("*.json"):
         if all and not name:
             ticket.unlink()
@@ -16,7 +20,6 @@ def clear_job_tickets(name=None, all=False):
 
 def validate_status(status: List[str]) -> bool:
     """Checks if the status is valid. Returns True if the status is valid, False otherwise."""
-    from constants import JOB_STATUS
     # check if the status is valid
     if not all([s in JOB_STATUS for s in status]):
         logger.error("Invalid status given to write_job_list_with_params.")
@@ -25,9 +28,6 @@ def validate_status(status: List[str]) -> bool:
 
 
 def write_job_tickets(queue, num_jobs, num_tickets):
-    from constants import JOB_TICKETS
-    from utils import generate_id
-    import json
     # save all portions of the queue with length num_jobs as a job ticket
     # split the queue into parts of length num_jobs
     job_tickets = [queue[i:i + num_jobs]
@@ -45,9 +45,6 @@ def write_job_tickets(queue, num_jobs, num_tickets):
 
 
 def read_job_list():
-    import json
-    import fasteners
-    from constants import JOB_LIST
     # Create a file lock
     lock = fasteners.InterProcessLock(str(JOB_LIST) + ".lock")
     # Acquire the lock
@@ -61,9 +58,6 @@ def read_job_list():
 
 def get_job_ticket(worker_name) -> Union[List[Dict], None]:
     """Returns the job ticket with the given name. If the job ticket does not exist, returns None."""
-    from constants import JOB_TICKETS
-    import json
-    import os.path
     # read job ticket from job ticket directory
     ticket_path = JOB_TICKETS / f"{worker_name}.json"
     # if the job ticket does not exist, return None
@@ -102,9 +96,6 @@ def write_job_list(job_updates: List[Dict[str, str]], params_given=False, conver
         Returns:
             None
     """
-    import json
-    import fasteners
-    from constants import JOB_LIST
     # from job ticket, get all parameters corresponding to the name to find the job in the job list
     if not params_given:
         # get all parameters from workers with given worker_names
@@ -142,6 +133,8 @@ def write_job_list(job_updates: List[Dict[str, str]], params_given=False, conver
 
 
 def validate_jobs(job_status_dict):
+    if isinstance(job_status_dict, dict):
+        job_status_dict = [job_status_dict]
     from priority_queue import flatten_job_list, get_trials_from_ids
     # read the job list
     job_list = read_job_list()
@@ -165,7 +158,7 @@ def find_status(job_list, params):
 
 
 def find_jobs_with_status(worker_name, status: Union[str, List[str]]):
-    from priority_queue import flatten_job_list, get_trials_from_ids
+    """Takes a worker_name and returns a generator of all jobs with the given status."""
     status = [status] if isinstance(status, str) else status
     # load the worker manager
     WorkerManager = load_worker_manager()
@@ -193,7 +186,6 @@ def update_jobs_status(worker_name: str, prev_status: str, new_status: str):
 
 def generate_data_dirs():
     """Generates the data directories for the worker output."""
-    from constants import WORKER_OUTPUT_DIR
     # read the job list
     job_list = read_job_list()
     # for equation in job_list, for algorithm in equation, for trial in algorithm, make a directory
@@ -202,4 +194,77 @@ def generate_data_dirs():
             dir = WORKER_OUTPUT_DIR / equation / algorithm
             dir.mkdir(parents=True, exist_ok=True)
 
+
+def update_all_running_to_stopped():
+    """Updates all jobs with status "running" to "stopped"."""
+    # Create a file lock
+    lock = fasteners.InterProcessLock(str(JOB_LIST) + ".lock")    
+    with lock:
+        # Read the job list
+        with open(JOB_LIST, "r+") as file:
+            # Load the JSON data from the file
+            job_list = json.load(file)
+        # Update the job list
+        for equation, value in job_list['equations'].items():
+            for algorithm in value['trials'].keys():
+                for trial in value['trials'][algorithm].keys():
+                    if value['trials'][algorithm][trial]['status'] == 'running':
+                        value['trials'][algorithm][trial]['status'] = 'stopped'
+        # Write the job list
+        with open(JOB_LIST, "w+") as file:
+            json.dump(job_list, file)
+
+
 # TODO: update equation status (pending, running, finished)
+
+def backup_job_list():
+    """Backs up the job list."""
+    job_list = read_job_list()
+    name = f"job_list_{time.strftime('%Y%m%d-%H%M%S')}.json"
+    with open(JOB_LIST_BACKUP_DIR / name, "w+") as file:
+        json.dump(job_list, file)
+
+def find_newest_backup():
+    import datetime
+    """Finds the newest backup file. If there are no backup files, returns None."""
+    # get all backup files
+    backup_files = list(JOB_LIST_BACKUP_DIR.glob('*.json'))
+    if len(backup_files) == 0:
+        return None
+    # get the newest backup file
+    # get the time from the file name. The format is job_list_YYYYMMDD-HHMMSS.json
+    backup_times = [datetime.datetime.strptime(b.name[9:-5], '%Y%m%d-%H%M%S') for b in backup_files]
+    newest_backup = backup_files[backup_times.index(max(backup_times))]
+    return newest_backup
+    
+
+def is_valid_job_list_file(threshold=0.2):
+    # Check if the file exists
+    if not JOB_LIST.exists():
+        logger.error(f"Job list file {JOB_LIST} does not exist.")
+        return False
+    # get the newest backup file
+    newest_backup = find_newest_backup()
+    # if there are no backup files, return True
+    if newest_backup is None:
+        # There is no backup file, so the job list file is valid
+        return True
+    # if the job list file is much smaller than the newest backup file, return False
+    if JOB_LIST.stat().st_size < newest_backup.stat().st_size * (1 - threshold):
+        print(JOB_LIST.stat().st_size, newest_backup.stat().st_size)
+        logger.error(f"Job list file {JOB_LIST} is smaller than the newest backup file {newest_backup}.")
+        return False
+    else:
+        # The file is valid
+        return True
+    
+def replace_job_list_file():
+    """Replaces the job list file with the newest backup file."""
+    # check if the job list file is valid
+    if is_valid_job_list_file():
+        return
+    # get the newest backup file
+    newest_backup = find_newest_backup()
+    # replace the job list file with the newest backup file
+    logger.warning(f"Replacing job list file {JOB_LIST} with the newest backup file {newest_backup}.")
+    os.replace(newest_backup, JOB_LIST)

@@ -84,6 +84,11 @@ def get_worker_names(exclude_CG=False):
         return get_SLURM_monitor()[get_SLURM_monitor()['state'] != 'CG']['name'].values
     return get_SLURM_monitor()['name'].values
 
+def get_worker_ids(exclude_CG=False):
+    if exclude_CG:
+        return get_SLURM_monitor()[get_SLURM_monitor()['state'] != 'CG']['jobid'].values
+    return get_SLURM_monitor()['jobid'].values
+
 
 def print_jobs_as_table(job_df, alerts):
     table_data = job_df.values.tolist()

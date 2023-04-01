@@ -7,9 +7,10 @@ from utils import Logger
 from monitor import get_worker_number
 from worker import WorkerManager, Worker, load_worker_manager, delete_pickle_file
 from email_scraper import check_for_new_events
-from job_list_handler import validate_jobs, read_job_list, clear_job_tickets, write_job_tickets, update_jobs_status, generate_data_dirs, get_job_ticket
+from job_list_handler import validate_jobs, read_job_list, clear_job_tickets, write_job_tickets, update_jobs_status, generate_data_dirs, get_job_ticket, backup_job_list, replace_job_list_file
+from progress import get_progress
 
-from constants import WORKER_NUM, PARALLEL_PROCS, SCHEDULER_INTERVAL
+from constants import WORKER_NUM, PARALLEL_PROCS, SCHEDULER_INTERVAL, BACKUP_INTERVAL
 
 
 def start_job_orchestrator():
@@ -59,6 +60,7 @@ def start_job_orchestrator():
             all_stopped = WorkerManager.delete_all_workers()
         # validate that all workers have been deleted
         assert len(WorkerManager.get_workers()) == 0
+        WorkerManager.kill_all_jobs()
         delete_pickle_file()
         clear_job_tickets(all=True)
         sys.exit(0)
@@ -73,11 +75,20 @@ def start_job_orchestrator():
     # Generate the data directories
     logger.info("Generating data directories...")
     generate_data_dirs()
-
+    logger.info("Checking validity of job list...")
+    replace_job_list_file()
 
     logger.info("Starting the job orchestrator main loop...")
+    counter = 0
+    
     # MAIN LOOP
     while True:
+        # If the while loop counter reaches a certain number, then backup the job list
+        if counter >= BACKUP_INTERVAL:
+            backup_job_list()
+            counter = 0
+        counter += 1
+
         # check if the terminate flag is set
         start_time = time.time()
         # check if there are any new events
@@ -88,12 +99,19 @@ def start_job_orchestrator():
             alerts = []
         if alerts:
             for alert in alerts:
+                # check if the job name is in worker names
+                if not alert['name'] in WorkerManager.get_worker_names():
+                    logger.warning(
+                        f"Job {alert['job_id']} with job ticket {alert['name']} is not registered in the job orchestrator but was alerted by email. Please check the job logs. This can be ignored if the job was cancelled in a previous run.")
+                    continue
                 if alert['status'] == 'COMPLETED':
                     # remove the job ticket from the job list, if all jobs in the job ticket are marked as finished in the job list
                     if all(list(validate_jobs(dict(name=alert['name'], status='finished')))):
-                        clear_job_tickets(name=alert['name'])
+                        logger.info(
+                            f"Job {alert['job_id']} with job ticket {alert['name']} finished. Deleting job ticket and worker.")
                         # delete the worker
                         WorkerManager.delete_worker(alert['name'])
+                        clear_job_tickets(name=alert['name'])
                     else:
                         logger.error(
                             f"Job {alert['job_id']} with job ticket {alert['name']} finished but the job list does not match. Please check the job logs.")
@@ -104,8 +122,26 @@ def start_job_orchestrator():
                     # mark all running jobs from the stopped worker as 'stopped'
                     update_jobs_status(alert['name'], prev_status='running', new_status='stopped')
                     WorkerManager.delete_worker(alert['name'])
+                    clear_job_tickets(name=alert['name'])
             WorkerManager.save()
 
+        
+        # check if there are free workers
+        num_running_workers = get_worker_number()
+        # get progress
+        num_finished_jobs, num_running_jobs, num_all_jobs = get_progress()
+        if num_finished_jobs == num_all_jobs:
+            logger.info("DONE!! All jobs finished. Exiting the job orchestrator...")
+            break
+        if num_running_jobs > num_running_workers * PARALLEL_PROCS:
+            logger.error(
+                f"Number of running jobs ({num_running_jobs}) is greater than the number of workers ({num_running_workers}) * PARALLEL_PROCS ({PARALLEL_PROCS}). This should not happen.")
+            logger.error("Killing all jobs, deleting all job tickets and workers, and marking all running jobs as stopped...")
+            if WorkerManager.kill_all_jobs():
+                clear_job_tickets(all=True)
+            else:
+                logger.error("Could not kill all jobs...")
+        # check if there are free workers
         num_running_workers = get_worker_number()
         if (num_running_workers >= WORKER_NUM) or terminate:
             # if the number of workers is greater than or equal to the maximum number of workers, wait for a worker to finish
@@ -121,12 +157,23 @@ def start_job_orchestrator():
             # read the job list
             job_list = read_job_list()
             # make job tickets
-            queue = make_priority_queue(job_list, num_add_workers*PARALLEL_PROCS)
-            # clear job tickets
-            clear_job_tickets(all=True)
+            # get the number of jobs to add. If there are not enough jobs left, add all remaining jobs
+            num_jobs = PARALLEL_PROCS * num_add_workers if num_all_jobs-num_finished_jobs > PARALLEL_PROCS * num_add_workers else num_all_jobs-num_finished_jobs
+            # If there are not enough jobs left, add all remaining jobs. This is not a optimal solution, but it should work for now.
+            while True:
+                try:
+                    queue = make_priority_queue(job_list, num_jobs)
+                except IndexError:
+                    logger.error(
+                        f"Could not make a priority queue with {num_jobs} jobs. Trying with {num_jobs-1} jobs...")
+                    num_jobs -= 1
+                    continue
+                else:
+                    break
+                
             # write job tickets
             ticket_dict = write_job_tickets(
-                queue, num_jobs=PARALLEL_PROCS, num_tickets=num_add_workers)
+                queue, num_jobs=num_jobs//num_add_workers, num_tickets=num_add_workers)
             # add workers
             for i in range(num_add_workers):
                 ticket = next(ticket_dict)
@@ -147,8 +194,6 @@ def start_job_orchestrator():
 
 
         # wait if the time taken is less than the scheduler interval, otherwise, continue
-        end_time = time.time()
-        time_taken = end_time - start_time
+        time_taken = time.time() - start_time
         if time_taken < SCHEDULER_INTERVAL:
-            wait_time = SCHEDULER_INTERVAL - time_taken
-            time.sleep(wait_time)
+            time.sleep(SCHEDULER_INTERVAL - time_taken)

@@ -1,12 +1,13 @@
 # SCHEDULER CONFIG
-WORKER_NUM: 2
+WORKER_NUM: 10
 PARALLEL_PROCS: 60
 WORKER_TIMEOUT: "05:00:00"
 SCHEDULER_INTERVAL: 30
+BACKUP_INTERVAL: 10 # time of scheduler interval before backup
 
 # USER CONFIG
 EMAIL: "syreal_jobs@outlook.com"
-JOBS_DIR: "/beegfs/desy/user/bornemaf/data/syreal_output/job_testing"
+JOBS_DIR: "/beegfs/desy/user/bornemaf/data/syreal_output/GridSearch_Experiment"
 SLURM_USER: "bornemaf"
 SLURM_PARTITION: "allcpu"
 PYTHON_SCRIPT: "parallel.py"
