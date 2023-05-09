@@ -69,7 +69,7 @@ def _get_loss(model, x_diff, true_func, args, use_best_score):
     for k in range(len(model.equations_))[best_score_index:]:
         predictions = model.predict(x_diff, index=k).reshape(-1, 1)
         real_y = np.array(true_func(*args)).reshape(-1, 1)
-        loss_df["loss"][k] = (np.square(predictions - real_y)).mean(axis=0)
+        loss_df.loc[k, "loss"] = (np.square(predictions - real_y)).mean(axis=0)
     return loss_df
 
 
@@ -409,16 +409,23 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
             with open(f"{dir_name}/parameters.json", 'r') as q:
                 parameters = json.load(q)
             if parameters["converged"]:
-                return
+                # if the algorithm has already converged, return the results
+                # Time can't be retrieved from the parameters.json file securely, so it is set to None to indicate that it is not available
+                has_converged = True
+                n = int(parameters["last_n"])
+                return has_converged, int(n), None
         except:
             pass
         # select last samples (for last n)
-        last_n = int(np.unique(samples.sample_size)[~np.isnan(np.unique(samples.sample_size))][-1])
+        last_n = int(np.unique(samples.sample_size)[
+                     ~np.isnan(np.unique(samples.sample_size))][-1])
         if last_n >= (N_stop - 1):  # CHANGE 1 TO CURRENT STEPSIZE WITH FUNC _STEPS
+            # if the algorithm has not converged, but the step limit (N_stop) is reached, return the results
             parameter_dict["last_n"] = int(last_n)
             with open(f"{dir_name}/parameters.json", "w") as outfile:
                 json.dump(parameter_dict, outfile)
-            return
+            return False, int(last_n), None
+        # if the algorithm has not converged and the step limit is not reached, continue the algorithm
         samples = samples.loc[samples.sample_size == last_n]
         samples = samples.loc[:, samples.columns != 'sample_size']
         N_start = last_n
@@ -510,6 +517,10 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
                 # update datapoints to delete points that result in y = NaN
                 x_diff = x_diff[xy_diff_df.index]
                 x_diff_df = x_diff_df.iloc[xy_diff_df.index]
+                # if there are no valid points (x_diff is empty), raise exception
+                if len(x_diff) == 0:
+                    raise Exception(
+                        f"No valid points for evaluation of equations. The equation may be undefined in the given range. The equation is {eq} and the range is {boundaries}")
             else:
                 xy_diff_df = dataset_df
 

@@ -1,22 +1,22 @@
 # SCHEDULER CONFIG
-WORKER_NUM: 10
-PARALLEL_PROCS: 60
-WORKER_TIMEOUT: "05:00:00"
-SCHEDULER_INTERVAL: 30
-BACKUP_INTERVAL: 10 # time of scheduler interval before backup
+WORKER_NUM: 10 # number of workers to run
+PARALLEL_PROCS: 60 # number of parallel processes to run
+WORKER_TIMEOUT: "05:00:00" # time before worker is killed
+SCHEDULER_INTERVAL: 30 # time of scheduler interval before checking for new jobs
+BACKUP_INTERVAL: 1 # time of scheduler interval before backup
 
 # USER CONFIG
-EMAIL: "syreal_jobs@outlook.com"
-JOBS_DIR: "/beegfs/desy/user/bornemaf/data/syreal_output/GridSearch_Experiment"
-SLURM_USER: "bornemaf"
-SLURM_PARTITION: "allcpu"
-PYTHON_SCRIPT: "parallel.py"
-ENV: "PySR"
+EMAIL: "syreal_jobs@outlook.com" # email address for notifications
+JOBS_DIR: "/beegfs/desy/user/bornemaf/data/syreal_output/Feynman_Experiment_1_part-1" # path to the jobs directory
+SLURM_USER: "bornemaf" # user name for slurm
+SLURM_PARTITION: "allcpu" # partition for slurm to run on
+PYTHON_SCRIPT: "parallel.py" # python script to run for each job
+ENV: "PySR" # name of the conda environment to use
 
 # JOB CONFIG
-JOB_STATUS: ["running", "finished", "stopped", "pending"]
+JOB_STATUS: ["running", "finished", "stopped", "pending"] # status of the job
 
 # SYREAL CONFIG
-LOSS_THRESHOLD: 1.e-7
-MAX_ITERATIONS: 500
+LOSS_THRESHOLD: 1.e-7 # threshold of loss after which the job is stopped and marked as converged
+MAX_ITERATIONS: 500 # maximum number of steps to run
 PROCS: 0 # 0 = no multithreading. Every process will run on a single thread

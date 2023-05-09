@@ -28,16 +28,30 @@ from constants import FEYNMAN_CSV_FILE, JOB_LIST, WORKER_OUTPUT_DIR
 import csv
 import json
 import numpy as np
+from pathlib import Path
 
-def import_feynman_csv(ignore_equations=[]):
+def import_feynman_csv(ignore_equations=[], order_by_datapoints=False):
     with open(FEYNMAN_CSV_FILE, "r") as f:
         reader = csv.reader(f)
-        equations = [row[0] for row in reader]
+        equations = []
+        datapoints = []
+        for row in reader:
+            equations.append(row[0])
+            datapoints.append(row[1])
     # remove header
     equations = equations[1:]
+    datapoints = datapoints[1:]
+    # order by datapoints if requested. So that the equations with the least datapoints are first
+    if order_by_datapoints:
+        equations = np.array(equations)
+        datapoints = np.array(datapoints)
+        datapoints = datapoints.astype(np.float)
+        equations = equations[np.argsort(datapoints)]
     # remove ignored equations
     for eq in ignore_equations:
         equations.remove(eq)
+    # make equations python list
+    equations = list(equations)
     return equations
 
 def read_worker_output_dir(job_list):
@@ -62,8 +76,26 @@ def read_worker_output_dir(job_list):
                             job_list["equations"][eq]["trials"][algo][trial]["exec_time"] = params["time"]["Execution time"]                     
     return job_list
 
-def generate_job_list(algorithms, trials, pysr_kwargs, kwargs, ignore_equations=[], equations=[]):
-    if not equations:
+def generate_job_list(algorithms, trials, pysr_kwargs, kwargs, ignore_equations=[], equations=[], job_list_dir=None):
+    """
+    Generates a job list for the given algorithms and trials. The job list is saved to the job_list.json file.
+
+    algorithms : list
+        List of algorithms to run.
+    trials : int
+        Number of trials to run for each algorithm.
+    pysr_kwargs : dict
+        Parameters to pass to PySR.
+    kwargs : dict
+        Parameters to pass to the algorithm.
+    ignore_equations : list, optional
+        List of equations to ignore. The default is [].
+    equations : list, optional
+        List of equations to run. The default is [], in which case all equations are run.
+
+    """
+    # if equations is empty numpy array
+    if not list(equations):
         equations = import_feynman_csv(ignore_equations)
     if not isinstance(pysr_kwargs, list):
         pysr_kwargs = [pysr_kwargs for i in range(len(equations))]
@@ -94,9 +126,13 @@ def generate_job_list(algorithms, trials, pysr_kwargs, kwargs, ignore_equations=
         },
     }
     # Read the worker output directory to update the status of the jobs
+    job_list_file = JOB_LIST if job_list_dir is None else Path(job_list_dir) / "job_list.json"
     job_list = read_worker_output_dir(job_list)
-    with open(JOB_LIST, "w") as f:
-        # dump so that the json file is human readable, but small
+    # Create the directory for the job list
+    job_list_dir = job_list_file.parent
+    job_list_dir.mkdir(parents=True, exist_ok=True)
+    # Save the job list to the job_list.json file
+    with open(job_list_file, "w") as f:
         json.dump(job_list, f)
 
 
@@ -120,27 +156,29 @@ def clear_backups():
     for file in JOB_LIST_BACKUP_DIR.iterdir():
         file.unlink()
 
-if __name__ == "__main__":
-    #algorithms = ["random", "combinatory", "std", "complexity-std", "loss-std", "true-confusion"]
-    algorithms = ["random", "combinatory"]
-    
-    base_range_growing = np.array([5, 10, 15, 20, 30, 40, 50, 60, 80, 100], dtype=int)
-    base_range_linear = np.array([10, 20, 30, 40, 50, 60, 70, 80, 90, 100], dtype=int)
-    
+def grid_search_job_list(algorithms, base_range_growing, base_range_linear):
     # make a grid of populations and iterations as pysr_kwargs
     grid_values = dict(populations=base_range_linear//2, niterations=base_range_growing)
     pysr_kwargs = make_parameters_grid(grid_values)
-    #print(pysr_kwargs, len(pysr_kwargs))
-    #pysr_kwargs = [{"populations":i, "niterations": i} for i in range(len(equations)))]
     kwargs = [{} for i in range(len(pysr_kwargs))]
     equations = []
     equations=["I.6.2b" for i in range(len(pysr_kwargs))]
     ignore_equations = []
     trials_per_algorithm = 15
-    generate_job_list(algorithms, trials_per_algorithm, pysr_kwargs, kwargs, ignore_equations, equations=equations)
+    generate_job_list(algorithms, trials_per_algorithm, pysr_kwargs, kwargs, ignore_equations, equations)
     clear_backups()
 
-
-
+if __name__ == "__main__":
+    parts = 10
+    job_list_dirs = [f"/beegfs/desy/user/bornemaf/data/syreal_output/Feynman_Experiment_1_part-{i}/" for i in range(parts)]
+    algorithms = ["random", "combinatory", "std", "complexity-std", "loss-std", "true-confusion"]
+    equations = import_feynman_csv(order_by_datapoints=True)
+    # devide the equations into parts
+    equations = np.array_split(equations, parts)
+    pysr_kwargs = [{"populations": 35, "niterations": 20} for i in range(len(equations))]
+    kwargs = [{} for i in range(len(equations))]
+    trials_per_algorithm = 100
+    for i, job_list_dir in enumerate(job_list_dirs):
+        generate_job_list(algorithms, trials_per_algorithm, pysr_kwargs[i], kwargs[i], equations=equations[i], job_list_dir=job_list_dir)
 
 

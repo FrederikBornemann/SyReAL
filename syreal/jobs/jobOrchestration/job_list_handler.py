@@ -239,6 +239,7 @@ def find_newest_backup():
     
 
 def is_valid_job_list_file(threshold=0.2):
+    # TODO: check if you can load the joblist file
     # Check if the file exists
     if not JOB_LIST.exists():
         logger.error(f"Job list file {JOB_LIST} does not exist.")

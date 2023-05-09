@@ -1,10 +1,6 @@
-from progress import get_progress
-from monitor import get_worker_number
-from constants import PID_DIR, PID_FILE, TEMP_DIR, JOB_TICKETS, PID_LOGS_DIR, WORKER_NUM, WORKER_LOGS_DIR, WORKER_OUTPUT_DIR, JOBS_DIR, JOB_LIST_BACKUP_DIR
-import argparse
+# before importing anything else, create the directory structure. Some modules need it.
 import os
-import sys
-
+from constants import PID_LOG_FILE, PID_DIR, PID_FILE, TEMP_DIR, JOB_TICKETS, PID_LOGS_DIR, WORKER_NUM, WORKER_LOGS_DIR, WORKER_OUTPUT_DIR, JOBS_DIR, JOB_LIST_BACKUP_DIR, PARALLEL_PROCS
 
 def __setupDirectoryStructure():
     requiredLocations = [JOBS_DIR, TEMP_DIR, PID_DIR, PID_LOGS_DIR,
@@ -12,14 +8,21 @@ def __setupDirectoryStructure():
     for loc in requiredLocations:
         if not os.path.exists(loc):
             os.makedirs(loc)
-
-
+    # create log file
+    if not os.path.exists(PID_LOG_FILE):
+        with open(PID_LOG_FILE, "w") as f:
+            f.write("")
 # Make directories if they don't exist, because the modules need them
 __setupDirectoryStructure()
 
 
-# Check if the daemon is running
+from progress import get_progress
+from monitor import get_worker_number
+import argparse
+import sys
 
+
+# Check if the daemon is running
 def is_running():
     if os.path.exists(PID_FILE):
         with open(PID_FILE, "r") as f:
@@ -71,12 +74,17 @@ def monitor():
             print(
                 f"Worker number: \033[1m\033[93m{get_worker_number()}/{WORKER_NUM}\033[0m")
             try:
-                progress_finished, progress_running = get_progress(
-                    percent=True)
-            except:
+                num_finished, num_running, num_all, eta= get_progress(
+                    percent=False, ETA=True)
+                progress_finished = num_finished / num_all * 100
+                progress_running = num_running / (PARALLEL_PROCS*WORKER_NUM) * 100
+            except Exception as e:
                 progress_finished, progress_running = 0, 0
+                num_finished, num_running, num_all, eta = 0, 0, 0, 0
+
             print(
-                f"Progress: \033[1m\033[94m{round(progress_finished,5)}\033[0m % finished, \033[1m\033[92m{round(progress_running,5)}\033[0m % running\033[0m")
+                f"Progress: \033[1m\033[94m{round(progress_finished,5)}\033[0m % finished ({num_finished}/{num_all}), \033[1m\033[92m{round(progress_running,5)}\033[0m % running ({num_running})\033[0m")
+            print(f"ETA: \033[1m\033[92m{round(eta,1)}\033[0m minutes")
             print("\n\033[91mPress enter to exit.\033[0m")
             sleep_time = 10
             for i in range(sleep_time):

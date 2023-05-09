@@ -80,6 +80,7 @@ def start_job_orchestrator():
 
     logger.info("Starting the job orchestrator main loop...")
     counter = 0
+    inbalanced_counter = 0
     
     # MAIN LOOP
     while True:
@@ -129,21 +130,36 @@ def start_job_orchestrator():
         # check if there are free workers
         num_running_workers = get_worker_number()
         # get progress
-        num_finished_jobs, num_running_jobs, num_all_jobs = get_progress()
+        while True:
+            try:
+                num_finished_jobs, num_running_jobs, num_all_jobs = get_progress()
+                break
+            except ValueError as e:
+                logger.error(f"Error while getting progress: {e}")
+                # replace the job list file with the backup
+                replace_job_list_file()
         if num_finished_jobs == num_all_jobs:
             logger.info("DONE!! All jobs finished. Exiting the job orchestrator...")
             break
         if num_running_jobs > num_running_workers * PARALLEL_PROCS:
-            logger.error(
-                f"Number of running jobs ({num_running_jobs}) is greater than the number of workers ({num_running_workers}) * PARALLEL_PROCS ({PARALLEL_PROCS}). This should not happen.")
-            logger.error("Killing all jobs, deleting all job tickets and workers, and marking all running jobs as stopped...")
-            if WorkerManager.kill_all_jobs():
-                clear_job_tickets(all=True)
+            inbalanced_counter += 1
+            if inbalanced_counter >= 5:
+                inbalanced_counter = 0
+                logger.error(
+                    f"Number of running jobs ({num_running_jobs}) is greater than the number of workers ({num_running_workers}) * PARALLEL_PROCS ({PARALLEL_PROCS}). This should not happen.")
+                logger.error("Killing all jobs, deleting all job tickets and workers, and marking all running jobs as stopped...")
+                if WorkerManager.kill_all_jobs():
+                    clear_job_tickets(all=True)
+                else:
+                    logger.error("Could not kill all jobs...")
             else:
-                logger.error("Could not kill all jobs...")
+                logger.warning(
+                    f"Number of running jobs ({num_running_jobs}) is greater than the number of workers ({num_running_workers}) * PARALLEL_PROCS ({PARALLEL_PROCS}). This should not happen.")
+        else:
+            inbalanced_counter = 0
         # check if there are free workers
         num_running_workers = get_worker_number()
-        if (num_running_workers >= WORKER_NUM) or terminate:
+        if (num_running_workers >= WORKER_NUM) or terminate or (num_all_jobs-num_finished_jobs-num_running_jobs == 0):
             # if the number of workers is greater than or equal to the maximum number of workers, wait for a worker to finish
             if (num_running_workers == 0) and terminate:
                 # if there are no workers running and the terminate flag is set, exit the job orchestrator
@@ -158,7 +174,10 @@ def start_job_orchestrator():
             job_list = read_job_list()
             # make job tickets
             # get the number of jobs to add. If there are not enough jobs left, add all remaining jobs
-            num_jobs = PARALLEL_PROCS * num_add_workers if num_all_jobs-num_finished_jobs > PARALLEL_PROCS * num_add_workers else num_all_jobs-num_finished_jobs
+            num_jobs = PARALLEL_PROCS * num_add_workers if num_all_jobs-num_finished_jobs-num_running_jobs > PARALLEL_PROCS * num_add_workers else num_all_jobs-num_finished_jobs-num_running_jobs
+            if num_jobs == 0:
+                logger.info("No jobs left to add. Waiting for a worker to finish...")
+                continue
             # If there are not enough jobs left, add all remaining jobs. This is not a optimal solution, but it should work for now.
             while True:
                 try:
@@ -171,9 +190,13 @@ def start_job_orchestrator():
                 else:
                     break
                 
+            if num_jobs < PARALLEL_PROCS * num_add_workers:
+                logger.warning(
+                    f"Could not add {num_add_workers} workers with {PARALLEL_PROCS} jobs each. Adding {-(-num_jobs // PARALLEL_PROCS)} workers with {PARALLEL_PROCS} jobs each. Number of jobs to distribute: {num_jobs}.")
+                num_add_workers = -(-num_jobs // PARALLEL_PROCS)
             # write job tickets
             ticket_dict = write_job_tickets(
-                queue, num_jobs=num_jobs//num_add_workers, num_tickets=num_add_workers)
+                queue, num_jobs=-(-num_jobs // num_add_workers), num_tickets=num_add_workers)
             # add workers
             for i in range(num_add_workers):
                 ticket = next(ticket_dict)

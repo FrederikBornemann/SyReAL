@@ -77,7 +77,7 @@ class Worker:
         # If the worker stops itself before updateing the job list, the job list will not be updated.
         self.update_status(new_status="stopped", prev_status="running")
         # Cancel job
-        cmd = ["scancel", self.job_id]
+        cmd = ["scancel", str(self.job_id)]
         process = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = process.communicate()
@@ -92,7 +92,7 @@ class Worker:
         # Continuously check squeue for job status
         start_time = time.time()
         while True:
-            cmd = ["squeue", "-j", self.job_id]
+            cmd = ["squeue", "-j", str(self.job_id)]
             process = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = process.communicate()
@@ -182,7 +182,7 @@ class WorkerManager:
         results = []
         job_ids = get_worker_ids(exclude_CG=True)
         for job_id in job_ids:
-            cmd = ["scancel", job_id]
+            cmd = ["scancel", str(job_id)]
             process = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = process.communicate()
