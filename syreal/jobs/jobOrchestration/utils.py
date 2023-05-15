@@ -1,16 +1,19 @@
-# this function generates a unique ID for a number of parameters and returns the first n characters of the hash
-def generate_id(*params, n=8):
-    import hashlib
-    # Concatenate the parameters into a single string
-    param_string = "".join([str(param) for param in params])
-    # Create a SHA-256 hash object
-    hash_object = hashlib.sha256()
-    # Encode the parameter string as bytes and update the hash object
-    hash_object.update(param_string.encode())
-    # Get the hexadecimal representation of the hash
-    hex_digest = hash_object.hexdigest()
-    # Return the first n characters of the hash as the ticket ID
-    return hex_digest[:n]
+# This file contains the functions used in the job orchestration module.
+import timeit
+import hashlib
+import json
+
+
+def generate_id(lst, n=8) -> str:
+    """Generate a unique id from a list of objects."""
+    # Convert the list to a JSON string
+    json_str = json.dumps(lst, sort_keys=True)
+    # Generate a hash object from the JSON string
+    hasher = hashlib.sha256()
+    hasher.update(json_str.encode('utf-8'))
+    # Return the first n characters of the hash digest
+    return hasher.hexdigest()[:n]
+
 
 def Logger(add_handler=True):
     """Create a logger that logs to a file and returns the logger and the file descriptor"""
@@ -27,14 +30,18 @@ def Logger(add_handler=True):
     keep_fds = [handler.stream.fileno()]
     return logger, keep_fds
 
-import timeit
 
 def timeit_wrapper(func):
+    """Decorator to time a function."""
+    logger, keep_fds = Logger(add_handler=False)
+
     def wrapper(*args, **kwargs):
         start_time = timeit.default_timer()
         result = func(*args, **kwargs)
         end_time = timeit.default_timer()
-        print("Function {} took {} seconds to execute.".format(func.__name__, end_time - start_time))
+        logger.info("Function {} took {} seconds to execute.".format(
+            func.__name__, end_time - start_time))
+        print("Function {} took {} seconds to execute.".format(
+            func.__name__, end_time - start_time))
         return result
     return wrapper
-

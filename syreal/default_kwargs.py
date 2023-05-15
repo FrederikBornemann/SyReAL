@@ -7,7 +7,6 @@ default_pysr_kwargs = dict(
 
 default_syreal_kwargs = dict(
     upper_sigma=0.0,
-    niterations=30,
     unary_operators=["neg", "square", "cube",
                      "exp", "sqrt", "sin", "cos", "tanh"],
     binary_operators=["plus", "sub", "mult", "div"],

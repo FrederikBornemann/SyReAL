@@ -1,10 +1,19 @@
 # before importing anything else, create the directory structure. Some modules need it.
+import sys
+import argparse
+from monitor import get_worker_number
+from progress import get_progress
 import os
-from constants import PID_LOG_FILE, PID_DIR, PID_FILE, TEMP_DIR, JOB_TICKETS, PID_LOGS_DIR, WORKER_NUM, WORKER_LOGS_DIR, WORKER_OUTPUT_DIR, JOBS_DIR, JOB_LIST_BACKUP_DIR, PARALLEL_PROCS
+from constants import PID_LOG_FILE, PID_DIR, PID_FILE, TEMP_DIR, JOB_TICKETS, PID_LOGS_DIR, WORKER_NUM, WORKER_LOGS_DIR, WORKER_OUTPUT_DIR, JOBS_DIR, JOB_LIST_BACKUP_DIR, PARALLEL_PROCS, SCHEDULER_INTERVAL, BATCH_DIR
+
 
 def __setupDirectoryStructure():
+    # if WORKER_OUTPUT_DIR does not exist or the directory has no subdirectories, raise an error
+    if not os.path.exists(WORKER_OUTPUT_DIR) or len(os.listdir(WORKER_OUTPUT_DIR)) == 0:
+        raise Exception(
+            "The worker output directory does not exist or is empty. Please create and fill it. The default location is: " + str(WORKER_OUTPUT_DIR)) + ". The job orchestration will not work without it."
     requiredLocations = [JOBS_DIR, TEMP_DIR, PID_DIR, PID_LOGS_DIR,
-                         JOB_TICKETS, WORKER_OUTPUT_DIR, WORKER_LOGS_DIR, JOB_LIST_BACKUP_DIR]
+                         JOB_TICKETS, WORKER_OUTPUT_DIR, WORKER_LOGS_DIR, JOB_LIST_BACKUP_DIR, BATCH_DIR]
     for loc in requiredLocations:
         if not os.path.exists(loc):
             os.makedirs(loc)
@@ -12,14 +21,10 @@ def __setupDirectoryStructure():
     if not os.path.exists(PID_LOG_FILE):
         with open(PID_LOG_FILE, "w") as f:
             f.write("")
+
+
 # Make directories if they don't exist, because the modules need them
 __setupDirectoryStructure()
-
-
-from progress import get_progress
-from monitor import get_worker_number
-import argparse
-import sys
 
 
 # Check if the daemon is running
@@ -73,24 +78,21 @@ def monitor():
             print_jobs_as_table(monitor, alerts)
             print(
                 f"Worker number: \033[1m\033[93m{get_worker_number()}/{WORKER_NUM}\033[0m")
-            try:
-                num_finished, num_running, num_all, eta= get_progress(
-                    percent=False, ETA=True)
-                progress_finished = num_finished / num_all * 100
-                progress_running = num_running / (PARALLEL_PROCS*WORKER_NUM) * 100
-            except Exception as e:
-                progress_finished, progress_running = 0, 0
-                num_finished, num_running, num_all, eta = 0, 0, 0, 0
+            progress_finished, progress_running = get_progress(
+                percent=True, round_to=5)
+            num_finished, num_running, num_all = get_progress(percent=False)
 
             print(
-                f"Progress: \033[1m\033[94m{round(progress_finished,5)}\033[0m % finished ({num_finished}/{num_all}), \033[1m\033[92m{round(progress_running,5)}\033[0m % running ({num_running})\033[0m")
-            print(f"ETA: \033[1m\033[92m{round(eta,1)}\033[0m minutes")
+                f"Progress: \033[1m\033[94m{progress_finished}\033[0m % finished ({num_finished}/{num_all}), \033[1m\033[92m{progress_running}\033[0m % running ({num_running})\033[0m")
+            #print(f"ETA: \033[1m\033[92m{round(eta,1)}\033[0m minutes")
             print("\n\033[91mPress enter to exit.\033[0m")
-            sleep_time = 10
+            # check if the stop flag is set, if so break the loop. Do this in sleep because otherwise the loop will not break until the sleep is over
+            sleep_time = SCHEDULER_INTERVAL
             for i in range(sleep_time):
                 if stop_flag.is_set():
                     break
                 time.sleep(1)
+
     # create a separate thread for the while loop
     while_thread = threading.Thread(target=while_loop)
     # start the while loop thread
@@ -135,16 +137,13 @@ colors = ["\033[92m", "\033[91m", "\033[93m"]
 # Print status table
 # TODO: add progress percentage
 print("\nSTATUS\t\tWORKERS\t\tPROGRESS [finished] (running)")
-try:
-    progress_finished, progress_running = get_progress(percent=True)
-except:
-    progress_finished, progress_running = 0, 0
+progress_finished, progress_running = get_progress(percent=True, round_to=1)
 if is_running():
     print(
-        f"\033[92mRunning\033[0m\t\t({get_worker_number()}/{WORKER_NUM})\t\t[{round(progress_finished,1)} %] ({round(progress_running,1)} %)\n")
+        f"\033[92mRunning\033[0m\t\t({get_worker_number()}/{WORKER_NUM})\t\t[{progress_finished} %] ({progress_running} %)\n")
 else:
     print(
-        f"\033[91mStopped\033[0m\t\t({get_worker_number()}/{WORKER_NUM})\t\t[{round(progress_finished,1)} %] ({round(progress_running,1)} %)\n")
+        f"\033[91mStopped\033[0m\t\t({get_worker_number()}/{WORKER_NUM})\t\t[{progress_finished} %] ({progress_running} %)\n")
 parser = argparse.ArgumentParser()
 parser.add_argument("-action", type=str)
 args = parser.parse_known_args()[0]

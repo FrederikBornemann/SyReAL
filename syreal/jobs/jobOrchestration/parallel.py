@@ -1,9 +1,10 @@
 # fmt: off
 import concurrent.futures
 import argparse
+import json
 
 # imports from JobOrchestration
-from constants import SYREAL_PKG_DIR, LOSS_THRESHOLD, WORKER_OUTPUT_DIR, MAX_ITERATIONS
+from constants import SYREAL_PKG_DIR, LOSS_THRESHOLD, WORKER_OUTPUT_DIR, MAX_ITERATIONS, PYSR_PARAMETERS, SYREAL_PARAMETERS, BATCH_DIR, BATCH_SIZE
 from worker import WorkerManager, Worker, load_worker_manager
 from utils import Logger
 from feynman import Feynman
@@ -16,6 +17,7 @@ sys.path.insert(0, str(parent_dir))
 from default_kwargs import default_syreal_kwargs, default_pysr_kwargs
 from syreal import Search
 
+# Set up logging
 logger, keepfds = Logger(add_handler=False)
 
 # Get worker from command line
@@ -25,6 +27,7 @@ args = parser.parse_args()
 worker_name = args.worker_name
 # load worker manager from a pickle file
 WorkerManager = load_worker_manager()
+# get the worker
 try:
     worker = WorkerManager.get_worker(worker_name)
 except:
@@ -36,70 +39,111 @@ except:
 # Get jobs from worker
 jobs = worker.jobs
 
-# MAX_WORKERS = len(os.sched_getaffinity(0))
-# OUTPUT_DIR = Path(pkg_config["directory"]["outputParentDirectory"])
-# problem = feynman.mk_problems(Filter=dict(Filename="I.6.2b"))[0] # returns a list of problems which fulfill the Filter. In this case the list has only one element
-
-
+# define function to run the jobs
 def func(i):
-    job = list(jobs[i].values())[0]
-    # TODO: if equation status is pending, make it running.
-    problem = Feynman(job['equation'].split(" ")[1])
+    job = list(jobs[i][0])
+    equation, algorithm, trial = job
+    problem = Feynman(equation.split(" ")[1])
     # TODO: add custom pysr_kwargs
-    equation_params = job['equation_params']
-    pysr_kwargs = equation_params['pysr_kwargs']
+    pysr_kwargs = PYSR_PARAMETERS
     pysr_kwargs.update(dict(procs=0))
     default_pysr_kwargs.update(pysr_kwargs)
-    kwargs = equation_params['kwargs']
+    kwargs = SYREAL_PARAMETERS
     kwargs.update(dict(
-        algorithm=job['algorithm'],
+        algorithm=algorithm,
         eq=problem.equation,
         boundaries=problem.boundaries,
         N_stop=MAX_ITERATIONS,
         # TODO: make datapoints better by using dynamic datapoints.
-        seed=int(job['trial']),
+        seed=int(trial),
         parentdir=str(WORKER_OUTPUT_DIR / \
-                      job['equation'] / job['algorithm'] / job['trial']),
+                      equation / algorithm / trial),
         pysr_params=default_pysr_kwargs,
         abs_loss_zero_tol=LOSS_THRESHOLD,
-        warm_start=job['status'] == 'stopped',
+        warm_start=int(jobs[i][1]) == 0,
     ))
     default_syreal_kwargs.update(kwargs)
+    # write Running.txt file with worker_name
+    with open(WORKER_OUTPUT_DIR / equation / algorithm / trial / "Running.txt", "w") as f:
+        f.write(worker_name)
     converged, iterations, exec_time = Search(**default_syreal_kwargs)
-    # update the job status in the job list to finished. Also update the converged, iterations, and exec_time
-    write_job_list([dict(params=job, status='finished')], params_given=True,
-                   converged=converged, iterations=iterations, exec_time=exec_time)
+    # write parameters.json file and Done.txt file
+    parameters = dict(
+        converged=converged,
+        last_n=iterations,
+        exec_time=exec_time,)
+    with open(WORKER_OUTPUT_DIR / equation / algorithm / trial / "parameters.json", "w") as f:
+        json.dump(parameters, f)
+    with open(WORKER_OUTPUT_DIR / equation / algorithm / trial / "Done.txt", "w") as f:
+        f.write("Done")
+
+def batch_jobs() -> list:
+    """Load a batch of jobs from a pickle file and delete the file."""
+    import os
+    import pickle
+    import random
+    # Get a list of all pickle files in the directory
+    pickle_files = [f for f in os.listdir(BATCH_DIR) if f.endswith('.pickle')]
+    if len(pickle_files) == 0:
+        # Return None if no pickle files are found
+        return None
+    # Select a random pickle file from the list
+    pickle_file = random.choice(pickle_files)
+    file_path = os.path.join(BATCH_DIR, pickle_file)
+    # Read the pickle file
+    with open(file_path, 'rb') as f:
+        jobs = pickle.load(f)
+    # Delete the pickle file
+    os.remove(file_path)
+    # Return the file path and the loaded data
+    return jobs
 
 
-# run the jobs in parallel
-executor = concurrent.futures.ProcessPoolExecutor(max_workers=len(jobs))
-futures = [executor.submit(func, i) for i in range(len(jobs))]
 
-min_running = int(len(futures) * 0.65)
-running_count = len(futures)
-# wait for all the jobs to finish
-for future in concurrent.futures.as_completed(futures):
-    future.result()
-    # TODO: if running jobs drops under a precentage of the total submitted jobs, then cancel all running jobs
-    # Reason behind this is that the jobs take the same time if no other jobs are running. So it is better to have more jobs running at the same time.
-    running_count -= 1
-    if running_count <= min_running:
-        logger.info(
-            f"WORKER INFO: {worker_name} has {running_count} jobs running. Which is under the recuired job count. Cancelling remaining jobs.")
-        # cancel any remaining futures
-        for remaining_future in futures:
-            if remaining_future.running():
-                remaining_future.cancel()
-        # shutdown the executor
-        result = worker.stop()
-        # interesting to see if this gets printed, because the worker is stopped before this.
-        if result:
-            logger.info(f"WORKER INFO: {worker_name} stopped successfully.")
-        else:
-            logger.error(f"WORKER ERROR: {worker_name} failed to stop.")
-        executor.shutdown(wait=False, cancel_futures=True)
-        break
-executor.shutdown(wait=True)
-# All the jobs are done now
+MAX_PROCS = len(jobs)
+with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_PROCS) as executor:
+    # run the jobs in parallel
+    futures = [executor.submit(func, i) for i in range(len(jobs))]
+    ACTIVE_PROCS = MAX_PROCS
+    #logger.debug(f"WORKER {worker_name}: {executor._pending_work_items} with type {type(executor._pending_work_items)}")
+
+
+    for future in concurrent.futures.as_completed(futures):
+        future.result()
+        ACTIVE_PROCS -= 1
+
+        # If enough processes have completed, start a new batch
+        if MAX_PROCS - ACTIVE_PROCS >= BATCH_SIZE:
+            logger.debug(f"WORKER {worker_name}: Starting new batch of jobs")
+            jobs = batch_jobs()
+            futures += [executor.submit(func, i) for i in range(len(jobs))]
+            ACTIVE_PROCS += len(jobs)
+    executor.shutdown(wait=True)
+
+# min_running = int(len(futures) * 0.65)
+# running_count = len(futures)
+# # wait for all the jobs to finish
+# for future in concurrent.futures.as_completed(futures):
+#     future.result()
+#     # Reason behind this is that the jobs take the same time if no other jobs are running. So it is better to have more jobs running at the same time.
+#     running_count -= 1
+#     if running_count <= min_running:
+#         logger.info(
+#             f"WORKER INFO: {worker_name} has {running_count} jobs running. Which is under the recuired job count. Cancelling remaining jobs.")
+#         # cancel any remaining futures
+#         for remaining_future in futures:
+#             if remaining_future.running():
+#                 remaining_future.cancel()
+#         # shutdown the executor
+#         result = worker.stop()
+#         # interesting to see if this gets printed, because the worker is stopped before this.
+#         if result:
+#             logger.info(f"WORKER INFO: {worker_name} stopped successfully.")
+#         else:
+#             logger.error(f"WORKER ERROR: {worker_name} failed to stop.")
+#         executor.shutdown(wait=False, cancel_futures=True)
+#         break
+# executor.shutdown(wait=True)
+# # All the jobs are done now
 
 # fmt: on

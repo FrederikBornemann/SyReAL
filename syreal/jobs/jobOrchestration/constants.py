@@ -19,6 +19,7 @@ JOBS_DIR = Path(config['JOBS_DIR'])
 PYTHON_SCRIPT = config['PYTHON_SCRIPT']
 TEMP_DIR = JOBS_DIR / "tmp"
 JOB_LIST = JOBS_DIR / "job_list.json"
+JOB_DICT = JOBS_DIR / "job_dict.pickle"
 JOB_TICKETS = JOBS_DIR / "job_tickets"
 PID_DIR = TEMP_DIR / "pid"
 PID_FILE = PID_DIR / "job_scheduler.pid"
@@ -31,5 +32,7 @@ WORKER_OUTPUT_DIR = JOBS_DIR / "data"
 WORKER_LOGS_DIR = JOBS_DIR / "logs"
 PYTHON_SCRIPT_FILE = PKG_DIR / PYTHON_SCRIPT
 JOB_LIST_BACKUP_DIR = TEMP_DIR / "job_list_backup"
+PROGRESS_FILE = TEMP_DIR / "progress.json"
+BATCH_DIR = TEMP_DIR / "batch_job_tickets"
 
 

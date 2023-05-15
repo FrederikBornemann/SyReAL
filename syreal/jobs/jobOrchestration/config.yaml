@@ -2,12 +2,15 @@
 WORKER_NUM: 10 # number of workers to run
 PARALLEL_PROCS: 60 # number of parallel processes to run
 WORKER_TIMEOUT: "05:00:00" # time before worker is killed
-SCHEDULER_INTERVAL: 30 # time of scheduler interval before checking for new jobs
+SCHEDULER_INTERVAL: 120 # time of scheduler interval before checking for new jobs
 BACKUP_INTERVAL: 1 # time of scheduler interval before backup
+BATCH_SIZE: 10 # number of jobs to run for a batch refill
+BATCH_COUNT: 2 # number of batches for every worker to have in storage
+
 
 # USER CONFIG
-EMAIL: "syreal_jobs@outlook.com" # email address for notifications
-JOBS_DIR: "/beegfs/desy/user/bornemaf/data/syreal_output/Feynman_Experiment_1_part-1" # path to the jobs directory
+EMAIL: "syreal_jobs@outlook.com" # email address for notifications (OUTDATED)
+JOBS_DIR: "/beegfs/desy/user/bornemaf/data/syreal_output/Feynman_Experiment_1" # path to the jobs directory
 SLURM_USER: "bornemaf" # user name for slurm
 SLURM_PARTITION: "allcpu" # partition for slurm to run on
 PYTHON_SCRIPT: "parallel.py" # python script to run for each job
@@ -20,3 +23,12 @@ JOB_STATUS: ["running", "finished", "stopped", "pending"] # status of the job
 LOSS_THRESHOLD: 1.e-7 # threshold of loss after which the job is stopped and marked as converged
 MAX_ITERATIONS: 500 # maximum number of steps to run
 PROCS: 0 # 0 = no multithreading. Every process will run on a single thread
+ALGORITHMS: ["random", "combinatory", "std", "complexity-std", "loss-std", "true-confusion"] # algorithms to run
+TRIALS: 100 # number of trials to run for each algorithm
+PYSR_PARAMETERS:
+  niterations: 20
+  populations: 35
+SYREAL_PARAMETERS:
+
+
+

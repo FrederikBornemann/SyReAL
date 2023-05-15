@@ -17,20 +17,15 @@ class Worker:
         self.job_id = None
         self.status = None
 
-    def update_status(self, new_status, prev_status=None):
-        """Update the status of the worker and write the job list to the job list file. If prev_status is given, update the status of the jobs that have prev_status to new_status."""
-        from job_list_handler import write_job_list, update_jobs_status
+    def update_status(self, new_status):
+        """Update the status of the worker."""
         self.status = new_status
-        if not prev_status:
-            jobs_running = [dict(params=list(job.values())[
-                                 0], status=new_status) for job in self.jobs]
-            write_job_list(jobs_running, params_given=True)
-        else:
-            update_jobs_status(self.name, prev_status, new_status)
-            pass
+        
 
     def start(self):
+        """Start the worker by submitting a job to SLURM."""
         def write_worker_script(variables, filename):
+            """Write a shell script to submit to SLURM."""
             import os
             # import the template
             with open(SLURM_TEMPLATE_FILE, 'r') as f:
@@ -73,10 +68,13 @@ class Worker:
         os.remove(script_path)
 
     def stop(self):
+        """Stop the worker by cancelling the job from SLURM."""
         # Update job list. This is done before because the worker can stop itself.
         # If the worker stops itself before updateing the job list, the job list will not be updated.
-        self.update_status(new_status="stopped", prev_status="running")
+        # self.update_status(new_status="stopped", prev_status="running")
         # Cancel job
+        if self.job_id is None:
+            return True
         cmd = ["scancel", str(self.job_id)]
         process = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -89,6 +87,7 @@ class Worker:
             return True
 
     def await_queue(self):
+        """Wait for the job to be in the queue."""
         # Continuously check squeue for job status
         start_time = time.time()
         while True:
@@ -114,28 +113,35 @@ class WorkerManager:
 
     # save worker manager as a pickle file
     def save(self):
+        """Save the worker manager as a pickle file."""
         with open(WORKER_MANAGER_PICKLE_FILE, "wb") as file:
             pickle.dump(self, file)
 
     def add_worker(self, name, jobs):
+        """Add a worker to the worker manager."""
         worker = Worker(name, jobs)
         self.workers.append(worker)
         self.save()
         return worker
 
     def get_workers(self):
+        """Return a list of all workers."""
         return self.workers
 
     def get_worker_names(self):
+        """Return a list of all worker names."""
         return [worker.name for worker in self.workers]
 
     def get_worker(self, name):
+        """Return the worker with the given name."""
         for worker in self.workers:
             if worker.name == name:
                 return worker
         return None
 
     def validate(self):
+        """Validate the worker manager by checking if all workers are running and if all running workers are registered."""
+        # TODO: validate workermanager and delete all workers that are not running
         worker_names = set([worker.name for worker in self.workers])
         SLURM_worker_names = set(get_worker_names(exclude_CG=True))
         # Check if any workers are missing
@@ -151,6 +157,7 @@ class WorkerManager:
             return True, [], []
 
     def delete_worker(self, name):
+        """Delete the worker with the given name."""
         if not isinstance(name, list):
             name = [name]
         workers = self.workers.copy()
@@ -164,6 +171,7 @@ class WorkerManager:
                 yield result
 
     def delete_all_workers(self):
+        """Delete all workers."""
         workers = [worker.name for worker in self.workers]
         logger.debug(f"Stopping workers with names {workers}.")
         stopping_success = list(self.delete_worker(workers))
@@ -202,8 +210,21 @@ class WorkerManager:
             self.save()
             return False
 
+def stop_all_SLURM_nodes():
+    # get all SLURM job ids
+    job_ids = get_worker_ids(exclude_CG=True)
+    # cancel all jobs
+    for job_id in job_ids:
+        cmd = ["scancel", str(job_id)]
+        process = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = process.communicate()
+        if process.returncode != 0:
+            logger.error(
+                f"Failed to cancel job with ID {job_id} from SLURM. Error: {err}")
 
 def load_worker_manager():
+    """Load the worker manager from a pickle file."""
     if not WORKER_MANAGER_PICKLE_FILE.exists():
         return WorkerManager()
     with open(WORKER_MANAGER_PICKLE_FILE, "rb") as file:
@@ -212,5 +233,6 @@ def load_worker_manager():
 
 
 def delete_pickle_file():
+    """Delete the pickle file."""
     if WORKER_MANAGER_PICKLE_FILE.exists():
         WORKER_MANAGER_PICKLE_FILE.unlink()

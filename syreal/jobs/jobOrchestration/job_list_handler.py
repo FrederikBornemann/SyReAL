@@ -185,14 +185,16 @@ def update_jobs_status(worker_name: str, prev_status: str, new_status: str):
 
 
 def generate_data_dirs():
+    # TODO: change generation of data directories to the current system
     """Generates the data directories for the worker output."""
     # read the job list
     job_list = read_job_list()
     # for equation in job_list, for algorithm in equation, for trial in algorithm, make a directory
     for equation, value in job_list['equations'].items():
         for algorithm in value['trials'].keys():
-            dir = WORKER_OUTPUT_DIR / equation / algorithm
-            dir.mkdir(parents=True, exist_ok=True)
+            for trial in value['trials'][algorithm].keys():
+                dir = WORKER_OUTPUT_DIR / equation / algorithm / trial
+                dir.mkdir(parents=True, exist_ok=True)
 
 
 def update_all_running_to_stopped():

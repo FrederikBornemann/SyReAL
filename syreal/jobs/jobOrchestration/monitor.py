@@ -12,7 +12,8 @@ import time
 from prettytable import PrettyTable
 
 
-def get_SLURM_monitor():
+def get_SLURM_monitor() -> pd.DataFrame:
+    """Get the SLURM queue as a pandas dataframe."""
     monitor = [x.split() for x in str(subprocess.Popen(['squeue', '-u', 'bornemaf',
                                                         '-p', 'allcpu'], stdout=subprocess.PIPE).communicate()[0]).split(r'\n')[1:-1]]
     if len(monitor) == 0:
@@ -30,7 +31,14 @@ def get_SLURM_monitor():
     return monitor
 
 # check if SLURM queue has changed and return the changed rows in the queue
-def check_SLURM_monitor(monitor):
+def check_SLURM_monitor(monitor) -> tuple[pd.DataFrame, bool, pd.DataFrame, dict]:
+    """
+    Check if the SLURM queue has changed. Returns a tuple with the following values:
+    - monitor: the new SLURM queue as a pandas dataframe
+    - changed: True if the SLURM queue has changed, False otherwise
+    - changed_rows: the rows that have changed in the SLURM queue
+    - updated_jobs: a dictionary with the names of the jobs that have changed as keys and the changes as values
+    """
     new_monitor = get_SLURM_monitor()
 
     # drop all columns except jobid, state, and nodelist
@@ -76,21 +84,25 @@ def check_SLURM_monitor(monitor):
                 updated_jobs[name] = 'queued'
     return new_monitor, not changed_rows.empty, changed_rows, updated_jobs
 
-def get_worker_number():
+def get_worker_number() -> int:
+    """Get the number of workers in the SLURM queue."""
     return get_SLURM_monitor().shape[0]
 
-def get_worker_names(exclude_CG=False):
+def get_worker_names(exclude_CG=False) -> list:
+    """Get the names of the workers in the SLURM queue."""
     if exclude_CG:
         return get_SLURM_monitor()[get_SLURM_monitor()['state'] != 'CG']['name'].values
     return get_SLURM_monitor()['name'].values
 
-def get_worker_ids(exclude_CG=False):
+def get_worker_ids(exclude_CG=False) -> list:
+    """Get the ids of the workers in the SLURM queue."""
     if exclude_CG:
         return get_SLURM_monitor()[get_SLURM_monitor()['state'] != 'CG']['jobid'].values
     return get_SLURM_monitor()['jobid'].values
 
 
 def print_jobs_as_table(job_df, alerts):
+    """Print the jobs as a table."""
     table_data = job_df.values.tolist()
     # Create a table with columns
     table = PrettyTable()
