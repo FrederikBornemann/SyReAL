@@ -1,5 +1,5 @@
 # SCHEDULER CONFIG
-WORKER_NUM: 10 # number of workers to run
+WORKER_NUM: 20 # number of workers to run
 PARALLEL_PROCS: 60 # number of parallel processes to run
 WORKER_TIMEOUT: "05:00:00" # time before worker is killed
 SCHEDULER_INTERVAL: 120 # time of scheduler interval before checking for new jobs
@@ -10,7 +10,7 @@ BATCH_COUNT: 2 # number of batches for every worker to have in storage
 
 # USER CONFIG
 EMAIL: "syreal_jobs@outlook.com" # email address for notifications (OUTDATED)
-JOBS_DIR: "/beegfs/desy/user/bornemaf/data/syreal_output/Feynman_Experiment_1" # path to the jobs directory
+JOBS_DIR: "/beegfs/desy/user/bornemaf/data/syreal_output/Feynman_Experiment_first_pick" # path to the jobs directory
 SLURM_USER: "bornemaf" # user name for slurm
 SLURM_PARTITION: "allcpu" # partition for slurm to run on
 PYTHON_SCRIPT: "parallel.py" # python script to run for each job

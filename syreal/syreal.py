@@ -379,6 +379,8 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
         # when the folder already exists but there was no warm start declared, delete content of directory for a fresh start
         if not warm_start:
             for f in os.listdir(dir_name):
+                if f.endswith('.txt'):
+                    continue  # Skip this file and move on to the next one
                 try:
                     os.remove(os.path.join(dir_name, f))
                 except IsADirectoryError:
@@ -495,9 +497,6 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
     prev_equations_df = pd.DataFrame(
         columns=["equation", "occurrence", "location"])
 
-    print(f"Starting with {N_start} samples")  # DEBUG
-    print(f"Stopping at {N_stop} samples")  # DEBUG
-    print(f"Step size multiplier: {step_multiplier}")  # DEBUG
     for _N_start, _N_stop, _steps in _Steps(N_start, N_stop, step_multiplier):
         # DEBUG
         print(f"N_start: {_N_start}, N_stop: {_N_stop}, steps: {_steps}")
@@ -521,6 +520,9 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
                 if len(x_diff) == 0:
                     raise Exception(
                         f"No valid points for evaluation of equations. The equation may be undefined in the given range. The equation is {eq} and the range is {boundaries}")
+            # update args_diff because x_diff may have changed. Ignore _x_diff_df because it is not used (it was declared previously)
+            _x_diff_df, args_diff = _make_args(
+                x_diff, variable_num, boundaries)
             else:
                 xy_diff_df = dataset_df
 

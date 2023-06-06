@@ -49,7 +49,7 @@ def job_tickets(status_dict=None, jobs=None, ticket_num=None, jobs_in_ticket_num
         # save the ticket to a file in JOB_TICKETS
         job_ticket = dict(id=ID, jobs=jobs_slice)
         if save_to_file:
-            with open(JOB_TICKETS / f"{ID}.pickle", "wb") as f:
+            with open(ticket_directory / f"{ID}.pickle", "wb") as f:
                 pickle.dump(job_ticket, f)
         yield job_ticket
 

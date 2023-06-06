@@ -162,4 +162,8 @@ def get_finished_jobs_summary_2(export_csv=False):
 
 
 # print(get_finished_jobs_summary(export_csv=True))
-print(get_finished_jobs_summary_2(export_csv=True))
+# print(get_finished_jobs_summary_2(export_csv=True))
+
+
+# New summary
+

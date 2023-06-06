@@ -1,0 +1,602 @@
+{
+    "III.17.37": {
+        "found": false,
+        "found_instantly": false,
+        "failed": true,
+        "steps": null
+    },
+    "II.13.17": {
+        "found": false,
+        "found_instantly": false,
+        "failed": true,
+        "steps": null
+    },
+    "I.39.11": {
+        "found": false,
+        "found_instantly": false,
+        "failed": true,
+        "steps": null
+    },
+    "I.47.23": {
+        "found": false,
+        "found_instantly": false,
+        "failed": true,
+        "steps": null
+    },
+    "I.43.43": {
+        "found": false,
+        "found_instantly": false,
+        "failed": true,
+        "steps": null
+    },
+    "III.4.32": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "II.11.17": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 14.5
+    },
+    "II.8.31": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.333333333333333
+    },
+    "II.13.34": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "I.24.6": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 245.16666666666666
+    },
+    "II.10.9": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.166666666666667
+    },
+    "I.41.16": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "III.21.20": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.666666666666667
+    },
+    "II.11.20": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 18.333333333333332
+    },
+    "II.37.1": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.0
+    },
+    "III.13.18": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 16.166666666666668
+    },
+    "I.13.4": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 62.833333333333336
+    },
+    "II.3.24": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.0
+    },
+    "I.14.4": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.166666666666667
+    },
+    "I.25.13": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.0
+    },
+    "II.34.29a": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.166666666666667
+    },
+    "I.34.8": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.833333333333333
+    },
+    "I.12.5": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.0
+    },
+    "I.6.2b": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 157.33333333333334
+    },
+    "I.12.1": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.0
+    },
+    "I.30.3": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 43.666666666666664
+    },
+    "II.11.3": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 22.833333333333332
+    },
+    "II.15.5": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.833333333333333
+    },
+    "I.34.14": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 81.83333333333333
+    },
+    "I.11.19": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 11.0
+    },
+    "I.38.12": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 12.166666666666666
+    },
+    "III.7.38": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 6.0
+    },
+    "I.34.1": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.333333333333333
+    },
+    "III.10.19": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 23.333333333333332
+    },
+    "II.8.7": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.166666666666667
+    },
+    "II.6.15a": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "I.6.2": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 47.666666666666664
+    },
+    "I.39.1": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.0
+    },
+    "I.27.6": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 8.0
+    },
+    "I.12.2": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 8.166666666666666
+    },
+    "I.48.2": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "III.15.12": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 10.833333333333334
+    },
+    "III.15.27": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 7.0
+    },
+    "I.44.4": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "II.34.2a": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 5.833333333333333
+    },
+    "I.40.1": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 61.0
+    },
+    "II.24.17": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "II.6.11": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 8.0
+    },
+    "I.12.11": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 7.666666666666667
+    },
+    "I.29.4": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.0
+    },
+    "II.27.18": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.0
+    },
+    "I.18.12": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.166666666666667
+    },
+    "I.26.2": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "II.13.23": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "III.19.51": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 127.0
+    },
+    "I.18.4": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 13.166666666666666
+    },
+    "II.34.2": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.333333333333333
+    },
+    "I.6.2a": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 6.166666666666667
+    },
+    "I.43.31": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.0
+    },
+    "II.11.27": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "I.32.17": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "III.12.43": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.0
+    },
+    "II.34.11": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 7.0
+    },
+    "II.38.14": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.166666666666667
+    },
+    "II.6.15b": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 23.833333333333332
+    },
+    "I.8.14": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 16.166666666666668
+    },
+    "II.11.28": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 147.83333333333334
+    },
+    "II.34.29b": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 12.5
+    },
+    "I.34.27": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.166666666666667
+    },
+    "I.10.7": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 56.833333333333336
+    },
+    "I.43.16": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 6.0
+    },
+    "I.29.16": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "I.15.3t": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "I.15.1": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "I.32.5": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 31.833333333333332
+    },
+    "I.16.6": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 63.0
+    },
+    "I.14.3": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.0
+    },
+    "II.35.18": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 31.666666666666668
+    },
+    "I.13.12": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 17.166666666666668
+    },
+    "II.36.38": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 31.0
+    },
+    "III.8.54": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "I.30.5": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "I.37.4": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 22.166666666666668
+    },
+    "II.2.42": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 7.0
+    },
+    "I.18.14": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.833333333333333
+    },
+    "II.4.23": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.0
+    },
+    "II.21.32": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 49.0
+    },
+    "III.14.14": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 16.0
+    },
+    "II.38.3": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.5
+    },
+    "II.35.21": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 34.333333333333336
+    },
+    "III.15.14": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 6.0
+    },
+    "II.27.16": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.166666666666667
+    },
+    "I.39.22": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 6.0
+    },
+    "III.4.33": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "I.50.26": {
+        "found": true,
+        "found_instantly": false,
+        "failed": false,
+        "steps": 38.666666666666664
+    },
+    "I.9.18": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "III.9.52": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "I.12.4": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.166666666666667
+    },
+    "I.15.3x": {
+        "found": false,
+        "found_instantly": false,
+        "failed": false,
+        "steps": null
+    },
+    "II.15.4": {
+        "found": true,
+        "found_instantly": true,
+        "failed": false,
+        "steps": 5.833333333333333
+    }
+}

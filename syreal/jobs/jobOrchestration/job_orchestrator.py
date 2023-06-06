@@ -26,25 +26,22 @@ def start_job_orchestrator():
         """Validate the workers by checking if the workers are running and if the workers are registered. If the workers are not running but registered, delete the workers. If the workers are running but not registered, add the workers."""
         valid, missing_workers, extra_workers = WorkerManager.validate()
         if not valid:
-            logger.error(
-                f"Worker names do not match. Running but not registered: {missing_workers}, Registered but not running: {extra_workers}")
+            logger.error(f"Worker names do not match. Running but not registered: {missing_workers}, Registered but not running: {extra_workers}")
             logger.warning("Deleting extra workers...")
             for worker_name in extra_workers:
                 stopping_succeeded = WorkerManager.delete_worker(worker_name)
                 # the variable stopping_succeeded should be False, because the worker should not be running
                 if stopping_succeeded:
-                    logger.debug(
-                        f"Worker {worker_name} was running but has been deleted because it was monitored as running but not registered, this should not happen.")
-            logger.warning(
-                "Adding missing workers (if job ticket is still there)...")
+                    pass
+                    logger.debug(f"Worker {worker_name} was running but has been deleted because it was monitored as running but not registered, this should not happen.")
+            logger.warning("Adding missing workers (if job ticket is still there)...")
             for worker_name in missing_workers:
-                # TODO: change job tickets to current system
                 job_ticket = load_job_ticket(worker_name)
                 if job_ticket:
                     WorkerManager.add_worker(worker_name, job_ticket)
         return WorkerManager
 
-    WorkerManager = validate_worker_manager(WorkerManager)
+    #WorkerManager = validate_worker_manager(WorkerManager)
 
     def sigusr1_handler(signum, frame):
         logger.critical(
@@ -74,7 +71,7 @@ def start_job_orchestrator():
         start_time = time.time()
 
         # Compare the workers in the squeue with the workers in the WorkerManager. Fix any inbalances.
-        WorkerManager = validate_worker_manager(WorkerManager)
+        #WorkerManager = validate_worker_manager(WorkerManager)
 
         # make updated job status dict
         status_dict = write_job_dict()

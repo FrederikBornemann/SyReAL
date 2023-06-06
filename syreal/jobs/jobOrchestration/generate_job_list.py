@@ -24,7 +24,7 @@
 #     },
 # }
 
-from constants import FEYNMAN_CSV_FILE, JOB_LIST, WORKER_OUTPUT_DIR, ALGORITHMS, TRIALS
+from constants import FEYNMAN_CSV_FILE, JOB_LIST, WORKER_OUTPUT_DIR, ALGORITHMS, TRIALS, PKG_DIR
 import csv
 import json
 import numpy as np
@@ -46,7 +46,7 @@ def import_feynman_csv(ignore_equations=[], order_by_datapoints=False) -> list[s
     if order_by_datapoints:
         equations = np.array(equations)
         datapoints = np.array(datapoints)
-        datapoints = datapoints.astype(np.float)
+        datapoints = datapoints.astype(float)
         equations = equations[np.argsort(datapoints)]
     # remove ignored equations
     for eq in ignore_equations:
@@ -190,6 +190,19 @@ def grid_search_job_list(algorithms, base_range_growing, base_range_linear):
                       pysr_kwargs, kwargs, ignore_equations, equations)
     clear_backups()
 
+def read_feynman_info():
+    with open(PKG_DIR / "feynman_info.json", "r") as f:
+        info = json.load(f)
+    return info
+
+def ignored_equations(found=True, found_instantly=False, failed=False):
+    info = read_feynman_info()
+    ignored_equations = []
+    for eq in info:
+        if info[eq]["found"] != found or info[eq]["found_instantly"] != found_instantly or info[eq]["failed"] != failed:
+            ignored_equations.append(eq)
+    return ignored_equations
+
 
 if __name__ == "__main__":
     # parts = 10
@@ -204,4 +217,5 @@ if __name__ == "__main__":
     # for i, job_list_dir in enumerate(job_list_dirs):
     #     generate_job_list(algorithms, trials_per_algorithm, pysr_kwargs[i], kwargs[i], equations=equations[i], job_list_dir=job_list_dir)
 
-    generate_job_dirs()
+    ignored_equations_list = ignored_equations(found=True, found_instantly=False, failed=False)
+    generate_job_dirs(ignore_equations=ignored_equations_list)

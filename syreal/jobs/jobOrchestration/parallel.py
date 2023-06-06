@@ -45,10 +45,10 @@ def func(i):
     equation, algorithm, trial = job
     problem = Feynman(equation.split(" ")[1])
     # TODO: add custom pysr_kwargs
-    pysr_kwargs = PYSR_PARAMETERS
+    pysr_kwargs = PYSR_PARAMETERS if PYSR_PARAMETERS else {}
     pysr_kwargs.update(dict(procs=0))
     default_pysr_kwargs.update(pysr_kwargs)
-    kwargs = SYREAL_PARAMETERS
+    kwargs = SYREAL_PARAMETERS if SYREAL_PARAMETERS else {}
     kwargs.update(dict(
         algorithm=algorithm,
         eq=problem.equation,
@@ -116,6 +116,8 @@ with concurrent.futures.ProcessPoolExecutor(max_workers=MAX_PROCS) as executor:
         if MAX_PROCS - ACTIVE_PROCS >= BATCH_SIZE:
             logger.debug(f"WORKER {worker_name}: Starting new batch of jobs")
             jobs = batch_jobs()
+            if jobs is None:
+                continue
             futures += [executor.submit(func, i) for i in range(len(jobs))]
             ACTIVE_PROCS += len(jobs)
     executor.shutdown(wait=True)
