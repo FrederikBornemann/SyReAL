@@ -520,11 +520,12 @@ def _Search(algorithm, eq, seed, N, N_start, N_stop, boundaries, upper_sigma, lo
                 if len(x_diff) == 0:
                     raise Exception(
                         f"No valid points for evaluation of equations. The equation may be undefined in the given range. The equation is {eq} and the range is {boundaries}")
+            else:
+                xy_diff_df = dataset_df
+                
             # update args_diff because x_diff may have changed. Ignore _x_diff_df because it is not used (it was declared previously)
             _x_diff_df, args_diff = _make_args(
                 x_diff, variable_num, boundaries)
-            else:
-                xy_diff_df = dataset_df
 
             if i != 0:
                 time_start = datetime.now()
