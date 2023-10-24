@@ -6,6 +6,10 @@ from syreal.default_kwargs import default_syreal_kwargs, default_pysr_kwargs
 from syreal.jobs import feynman
 from syreal.jobs.read_config import read_config
 
+# TODO: read job ticket and create a jobs object, or import Worker
+# TODO: run jobs in parallel, right now it is just a single equation
+
+
 # read package config.yml
 pkg_config = read_config()
 

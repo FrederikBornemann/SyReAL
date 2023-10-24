@@ -1,93 +1,154 @@
-# TODO
-# [] read job list
-# [] make job tickets
-# [] spawn jobs
-# [] update job list
-
-
-# This is the main job orchestrator. It is responsible for spawning jobs and updating the job list.
-# It is also responsible for spawning the job monitor, which is responsible for monitoring the jobs
-
-import os
-import subprocess
+import time
+import signal
+import sys
 import json
-from pathlib import Path
-import fasteners
-import pandas as pd
 
-from priority_queue import make_priority_queue, get_trials_from_ids
-from id_generation import generate_id
+from priority_queue import job_tickets, clear_job_tickets, load_job_ticket
+from utils import Logger
+from monitor import get_worker_number
+from worker import WorkerManager, Worker, load_worker_manager, delete_pickle_file, stop_all_SLURM_nodes
+from job_monitor import write_job_dict, count_jobs
 
-
-PKG_DIR = Path(__file__).parents[3]
-JOBS_DIR = Path(os.environ.get('JOB_ORCHESTRATION_WORKSPACE'))
-JOB_LIST = JOBS_DIR / "job_list.json"
-JOB_TICKETS = JOBS_DIR / "job_tickets"
-SLURM_USER = os.environ.get('SLURM_USER')
-SLURM_PARTITION = os.environ.get('SLURM_PARTITION')
+from constants import WORKER_NUM, PARALLEL_PROCS, SCHEDULER_INTERVAL, PROGRESS_FILE
 
 
-def read_job_list():
-    # Read the job list
-    with open(JOB_LIST, "r+") as file:
-        # Load the JSON data from the file
-        data = json.load(file)
-    return data
+def start_job_orchestrator():
+    logger, keep_fds = Logger(add_handler=False)
 
+    # Set the terminate flag to False
+    global terminate
+    terminate = False
 
-def clear_job_tickets():
-    # remove all job tickets
-    for ticket in JOB_TICKETS.glob("*.json"):
-        ticket.unlink()
+    # Load WorkerManager from pickle file
+    WorkerManager = load_worker_manager()
 
-def write_job_tickets(queue, num_jobs):
-    # save all portions of the queue with length num_jobs as a job ticket
-    # split the queue into parts of length num_jobs
-    job_tickets = [queue[i:i + num_jobs] for i in range(0, len(queue), num_jobs)]
-    # save the job tickets to the job_tickets directory. If the directory does not exist, create it
-    if not JOB_TICKETS.exists():
-        JOB_TICKETS.mkdir()
-    # write the job tickets to the job_tickets directory
-    for ticket in job_tickets:
-        all_ids = [list(job.keys())[0] for job in ticket]
-        id = generate_id(*all_ids, n=8)
-        with open(JOB_TICKETS / f"job_ticket_{id}.json", "w+") as file:
-            json.dump(ticket, file)
+    def validate_worker_manager(WorkerManager):
+        """Validate the workers by checking if the workers are running and if the workers are registered. If the workers are not running but registered, delete the workers. If the workers are running but not registered, add the workers."""
+        valid, missing_workers, extra_workers = WorkerManager.validate()
+        if not valid:
+            logger.error(f"Worker names do not match. Running but not registered: {missing_workers}, Registered but not running: {extra_workers}")
+            logger.warning("Deleting extra workers...")
+            for worker_name in extra_workers:
+                stopping_succeeded = WorkerManager.delete_worker(worker_name)
+                # the variable stopping_succeeded should be False, because the worker should not be running
+                if stopping_succeeded:
+                    pass
+                    logger.debug(f"Worker {worker_name} was running but has been deleted because it was monitored as running but not registered, this should not happen.")
+            logger.warning("Adding missing workers (if job ticket is still there)...")
+            for worker_name in missing_workers:
+                job_ticket = load_job_ticket(worker_name)
+                if job_ticket:
+                    WorkerManager.add_worker(worker_name, job_ticket)
+        return WorkerManager
 
-def monitor_worker_nodes():
-    monitor = [x.split() for x in str(subprocess.Popen( ['squeue','-u','bornemaf','-p','allcpu'], stdout=subprocess.PIPE ).communicate()[0]).split(r'\n')[1:-1]]
-    # place every entry in the list into a dictionary with keys: jobid, partition, name, user, state, time, nodes, nodelist
-    monitor = [dict(zip(['jobid', 'partition', 'name', 'user', 'state', 'time', 'nodes', 'nodelist'], x)) for x in monitor]
-    # convert the jobid and nodes columns to integers
-    for x in monitor:
-        x['jobid'] = int(x['jobid'])
-        x['nodes'] = int(x['nodes'])
-    # convert monitor to pandas dataframe
-    monitor = pd.DataFrame(monitor)
-    return monitor
-    
+    #WorkerManager = validate_worker_manager(WorkerManager)
 
-if __name__ == "__main__":
-    # Create a file lock
-    lock = fasteners.InterProcessLock(str(JOB_LIST) + ".lock")
-    # Acquire the lock
-    with lock:
-        # Read the job list
-        job_list = read_job_list()
-    
-    # make job tickets
-    queue = make_priority_queue(job_list)
-    # clear job tickets
-    clear_job_tickets()
-    # write job tickets
-    write_job_tickets(queue, num_jobs=2)
-    # get worker nodes
-    monitor = monitor_worker_nodes()
-    print(monitor)
-    
-    
-    
-    
+    def sigusr1_handler(signum, frame):
+        logger.critical(
+            "Received SIGUSR1 signal. Exiting the job orchestrator but not killing any jobs...")
+        # Terminate the spawner, wait for the current job to finish, and then exit
+        global terminate
+        terminate = True
+        # The terminate flag will be checked in the main loop, if it is True and the running jobs are finished, the job orchestrator will exit
 
+    def sigterm_handler(signum, frame):
+        logger.critical(
+            "Received SIGTERM signal. Exiting the job orchestrator and killing all jobs...")
+        # Killing all SLURM nodes, deleting the pickle file, and clearing the job tickets
+        stop_all_SLURM_nodes()
+        delete_pickle_file()
+        clear_job_tickets()
+        sys.exit(0)
 
+    # Set the signal handler for SIGTERM and SIGKILL
+    signal.signal(signal.SIGTERM, sigterm_handler)
+    signal.signal(signal.SIGUSR1, sigusr1_handler)
 
+    logger.info("Starting the job orchestrator main loop...")
+    # MAIN LOOP
+    while True:
+        # Get the current time for the scheduler
+        start_time = time.time()
+
+        # Compare the workers in the squeue with the workers in the WorkerManager. Fix any inbalances.
+        #WorkerManager = validate_worker_manager(WorkerManager)
+
+        # make updated job status dict
+        status_dict = write_job_dict()
+        # get the number of jobs in each status
+        status_counter = count_jobs(status_dict)
+
+        # if all jobs are finished, exit the job orchestrator
+        num_all_jobs = sum(status_counter.values())
+        num_finished_jobs = status_counter["finished"]
+        if num_finished_jobs == num_all_jobs:
+            logger.info(
+                "DONE!! All jobs finished. Exiting the job orchestrator...")
+            break
+
+        # if prev_status_counter is not defined, define it
+        if 'prev_status_counter' not in locals():
+            prev_status_counter = dict()
+        # save the status counter if the counter has changed
+        if status_counter != prev_status_counter:
+            with open(PROGRESS_FILE, 'w') as f:
+                json.dump(status_counter, f)
+        prev_status_counter = status_counter
+
+        # check if there are free workers
+        num_running_workers = get_worker_number()
+
+        # check if there are free workers
+        num_running_workers = get_worker_number()
+        num_running_jobs = status_counter["running"]
+        if (num_running_workers >= WORKER_NUM) or terminate or (num_all_jobs-num_finished_jobs-num_running_jobs == 0):
+            # if the number of workers is greater than or equal to the maximum number of workers, wait for a worker to finish
+            if (num_running_workers == 0) and terminate:
+                # if there are no workers running and the terminate flag is set, exit the job orchestrator
+                logger.info(
+                    "All jobs have finished. Exiting the job orchestrator.")
+                sys.exit(0)
+        else:
+            # AFTER THIS POINT, A NEW WORKER CAN BE ADDED
+            # get the number of workers to add
+            num_add_workers = WORKER_NUM - get_worker_number()
+
+            logger.info(
+                f"Adding {num_add_workers} worker{'s' if num_add_workers>1 else ''}...")
+
+            # calculate the number of jobs that are not running (remaining jobs)
+            not_running_jobs_count = status_counter["pending"] + \
+                status_counter["stopped"]
+
+            # if there are no jobs left, wait for a worker to finish
+            if not_running_jobs_count == 0:
+                logger.info(
+                    "No jobs left to add. Waiting for a worker to finish...")
+                continue
+            # if the potential number of jobs to add is greater than the number of not running jobs, reduce the number of workers to add
+            if num_add_workers * PARALLEL_PROCS > not_running_jobs_count:
+                logger.info(
+                    f"Could not add {num_add_workers} workers with {PARALLEL_PROCS} jobs each. Adding {-(-not_running_jobs_count // PARALLEL_PROCS)} workers with {PARALLEL_PROCS} jobs each. Number of jobs to distribute: {not_running_jobs_count}.")
+                # round up using integer division and negation
+                num_add_workers = -(-not_running_jobs_count // PARALLEL_PROCS)
+            # add workers
+            for i, ticket in enumerate(job_tickets(status_dict=status_dict, ticket_num=num_add_workers)):
+                name, jobs = ticket["id"], ticket["jobs"]
+                # spawn a worker
+                worker = WorkerManager.add_worker(name, jobs)
+                # start the worker (this will submit the job to SLURM)
+                worker.start()
+                # await that the worker gets added to the queue, otherwise, log an error
+                if not worker.await_queue():
+                    logger.error(
+                        f"Worker {name} was not added to the queue. Timeout.")
+                    continue
+                worker.update_status("running")
+                WorkerManager.save()
+                if terminate:
+                    break
+
+        # wait if the time taken is less than the scheduler interval, otherwise, continue
+        time_taken = time.time() - start_time
+        if time_taken < SCHEDULER_INTERVAL:
+            time.sleep(SCHEDULER_INTERVAL - time_taken)
